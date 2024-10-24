@@ -1,0 +1,55 @@
+[tool.poetry]
+package-mode = false
+
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.115.3"
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.36"}
+uvicorn = {extras = ["standart"], version = "^0.32.0"}
+alembic = "^1.13.3"
+psycopg2-binary = "^2.9.10"
+asyncpg = "^0.30.0"
+pydantic-settings = "^2.6.0"
+pydantic = {extras = ["email"], version = "^2.9.2"}
+httpx = "^0.27.2"
+
+
+[tool.poetry.group.dev.dependencies]
+pylint = "^3.3.1"
+pytest = "^8.3.3"
+mypy = "^1.13.0"
+isort = "^5.13.2"
+black = "^24.10.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+# black
+[tool.black]
+line-length = 79
+extend-exclude = "migrations/"
+
+# isort
+[tool.isort]
+profile = "black"
+extend_skip_glob = ["migrations"]
+known_local_folder=["core", "crud", "api", "models", "schemas", "tests", "main", "utils"]
+line_length = 79
+lines_after_imports = 2
+
+
+# mypy
+[tool.mypy]
+exclude = ["migrations/"]
+
+[tool.pylint]
+ignore = [".git", "__pycache__", "migrations", ".venv"]
+max-line-length = 79
+disable = ["C0114", "C0115", "C0116", "W1514", "W3101", "R0903", "C0103"]
+
+# pytest
+[tool.pytest.ini_options]
+addopts = "-x"
+testpaths = ["app/tests"]
