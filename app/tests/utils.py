@@ -18,7 +18,17 @@ def make_alembic_config(
     dsn: str, script_location: str | None = None
 ) -> Config:
     """
-    Make alembic config for tests
+    Make alembic config for tests. Создается новый конфиг
+    для алембика,
+    потому что основной в енв подвязан под основую
+    БДб которая будет использоваться в проекте,
+    а нам нужна тестовая
+    project_config.ROOT_DIR - папка app
+    cначала формируем путь до алембик ини
+    потом подменяем тестинг на труб, а базовый
+    путь до сгенерированного
+    потом указываем папку для миграций, т.к. он сам не видит
+
     """
     alembic_cfg = Config(f"{project_config.ROOT_DIR}/alembic.ini")
     alembic_cfg.set_main_option("is_testing", "True")
@@ -38,6 +48,16 @@ def create_database(
 ) -> None:
     """
     Create database for tests
+    Создание БД с урлом, сформированным в контекстном
+    менеджере tmp_database
+    make_url формирует урл, который поймет алхимия
+    урл с постгрес существует всего, т.е. ее создавать
+    не нужно
+    main_url содержит урл с именем постгрес для подкючения
+    к основной(дефолтной) БД, с помощью которой
+    создается движок
+    на базе этого движка создается тестовая БД
+
     """
     url_obj = make_url(url)
     main_url = url_obj._replace(database="postgres")
@@ -111,6 +131,8 @@ async def async_drop_database(url: str) -> None:
 def tmp_database(
     str_url: str, db_name: str = "", suffix: str = "", **kwargs
 ) -> Iterator[str]:
+    """Формирование имени для тестовой БД для миграций,
+    на вход передали урл для подключения от фикстур"""
     if db_name == "":
         tmp_db_name = "_".join(
             [

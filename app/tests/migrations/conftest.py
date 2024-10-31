@@ -13,6 +13,7 @@ from tests.utils import make_alembic_config, tmp_database
 def pg_url_fixture() -> str:
     """
     Provides base PostgreSQL URL for creating temporary databases.
+    Формирование урла для БДб чтобы хост был локальный (для тестов)
     """
     config.DB_HOST = "localhost"
     return config.dsn
@@ -21,7 +22,8 @@ def pg_url_fixture() -> str:
 @pytest.fixture(name="postgres")
 def postgres_fixture(pg_url: str) -> Iterator[str]:
     """
-    Creates empty temporary database.
+    Creates empty temporary database. На вход принимается урл из предыдущей фикстуры с локальным хостом.
+    Эти параметры передаем в контекстный менеджер с урлом, но без имени БД
     """
     with tmp_database(pg_url, suffix="migrations") as tmp_url:
         yield tmp_url

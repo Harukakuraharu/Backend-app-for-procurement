@@ -21,11 +21,13 @@ def anyio_backend():
 def pg_url_fixture() -> str:
     """
     Provides base PostgreSQL URL for creating temporary databases.
+    Фикстура для создания дсн-урла для тестовой БД с локалхостом
     """
     config.DB_HOST = "localhost"
     return config.async_dsn  # type: ignore[return-value]
 
 
+# Чем отлчаются эти две фикстуры? Первый это шаблон, а второй?
 @pytest.fixture(scope="package", autouse=True, name="postgres_temlate")
 async def postgres_temlate_fixture(pg_url: str) -> AsyncIterator[str]:
     """
@@ -54,6 +56,7 @@ async def postgres_fixture(postgres_temlate: str) -> AsyncIterator[str]:
 async def postgres_engine_fixture(postgres: str) -> AsyncIterator[AsyncEngine]:
     """
     SQLAlchemy async engine, bound to temporary database.
+    Фикстура для создания движка
     """
     engine = create_async_engine(postgres, echo=True)  # type: ignore
     try:
@@ -73,6 +76,7 @@ async def async_session_fixture(
         yield session
 
 
+# чтоделает?? ващщщще не понятно
 @pytest.fixture(name="test_app")
 async def test_app_fixture(
     async_session: AsyncSession,
@@ -83,8 +87,8 @@ async def test_app_fixture(
 
 
 @pytest.fixture
-async def client(test_app):
+async def client(test_app: FastAPI) -> AsyncIterator[AsyncClient]:
     async with AsyncClient(
         transport=ASGITransport(app=test_app), base_url="http://test"
     ) as async_client:
-        return async_client
+        yield async_client

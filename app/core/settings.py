@@ -16,6 +16,7 @@ class Config(BaseSettings):
 
     @computed_field
     def async_dsn(self) -> str:
+        """Ссылка для асинхронного подключения к БД"""
         return (
             f"postgresql+asyncpg://{self.POSTGRES_USER}:"
             f"{self.POSTGRES_PASSWORD}@{self.DB_HOST}:"
@@ -24,6 +25,7 @@ class Config(BaseSettings):
 
     @computed_field
     def dsn(self) -> str:
+        """Ссылка для синхронного подключения к БД, для алембика"""
         return (
             f"postgresql://{self.POSTGRES_USER}:"
             f"{self.POSTGRES_PASSWORD}@{self.DB_HOST}:"

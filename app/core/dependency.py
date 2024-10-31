@@ -7,7 +7,7 @@ from core.settings import config
 
 
 async def get_session():
-    async with AsyncSession(create_async_engine(config.dsn)) as session:
+    async with AsyncSession(create_async_engine(config.async_dsn)) as session:
         yield session
 
 
