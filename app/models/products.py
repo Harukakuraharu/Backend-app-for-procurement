@@ -21,7 +21,9 @@ class Category(Base):
     id: Mapped[intpk]
     title: Mapped[str]
     products: Mapped[list["Product"]] = relationship(
-        back_populates="categories", lazy="joined", secondary=category_product
+        back_populates="categories",
+        lazy="selectin",
+        secondary=category_product,
     )
 
 
@@ -39,7 +41,7 @@ class Product(Base):
         back_populates="products", lazy="joined"
     )
     categories: Mapped[list["Category"]] = relationship(
-        back_populates="products", lazy="joined", secondary=category_product
+        back_populates="products", lazy="selectin", secondary=category_product
     )
 
 

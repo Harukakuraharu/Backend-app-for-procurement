@@ -21,9 +21,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(40), unique=True)
     password: Mapped[str] = mapped_column(String(72))
     name: Mapped[str] = mapped_column(String(15))
-    status: Mapped[UserStatus] = mapped_column(
-        server_default=UserStatus.BUYER.name, default=UserStatus.BUYER
-    )
+    status: Mapped[UserStatus]
     phone: Mapped[str]
     addresses: Mapped[list["UserAddress"]] = relationship(
         back_populates="user", lazy="joined"
@@ -46,7 +44,7 @@ class Shop(Base):
     )
     # pylint: disable=C0301
     products: Mapped[list["Product"]] = relationship(  # type: ignore[name-defined]
-        back_populates="shop", lazy="joined"
+        back_populates="shop", lazy="selectin"
     )
 
 
@@ -60,5 +58,5 @@ class UserAddress(Base):
         ForeignKey("user.id", ondelete="CASCADE")
     )
     user: Mapped[User] = relationship(
-        back_populates="addresses", lazy="joined"
+        back_populates="addresses", lazy="selectin"
     )
