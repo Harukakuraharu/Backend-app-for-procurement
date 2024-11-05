@@ -46,3 +46,12 @@ class UserUpdate(BaseModel):
     status: models.UserStatus
     name: str | None = None
     phone: str | None = None
+
+
+class Token(BaseModel):
+    access_token: str
+
+
+class UserLogin(BaseModel):
+    email: str
+    password: str

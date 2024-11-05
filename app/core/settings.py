@@ -14,6 +14,10 @@ class Config(BaseSettings):
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
 
+    SECRET_KEY: str = "fgdhghgdjhgh"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
     @computed_field
     def async_dsn(self) -> str:
         """Ссылка для асинхронного подключения к БД"""
