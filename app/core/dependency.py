@@ -29,7 +29,6 @@ async def get_user(session: AsyncSessionDependency, email: str):
 
 
 async def get_current_user(
-    # pylint: disable=C0301
     token: Annotated[HTTPAuthorizationCredentials, Depends(HTTPBearer())],
     session: AsyncSessionDependency,
 ) -> UserResponse:
