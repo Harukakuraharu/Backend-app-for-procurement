@@ -12,8 +12,7 @@ from tests.utils import make_alembic_config, tmp_database
 @pytest.fixture(scope="package", name="pg_url")
 def pg_url_fixture() -> str:
     """
-    Provides base PostgreSQL URL for creating temporary databases.
-    Формирование урла для БДб чтобы хост был локальный (для тестов)
+    Формирование URL для тестовой БД с localhost
     """
     config.DB_HOST = "localhost"
     return config.dsn
@@ -22,10 +21,11 @@ def pg_url_fixture() -> str:
 @pytest.fixture(name="postgres")
 def postgres_fixture(pg_url: str) -> Iterator[str]:
     """
-    Creates empty temporary database. На вход принимается урл из предыдущей фикстуры с локальным хостом.
-    Эти параметры передаем в контекстный менеджер с урлом, но без имени БД
+    На вход принимается pg_url из предыдущей фикстуры с localhost.
+    Эти параметры передаем в контекстный менеджер tmp_database,
+    возвращаем - новый URL с новым именем для тестовой БД
     """
-    with tmp_database(pg_url, suffix="migrations") as tmp_url:
+    with tmp_database(pg_url, db_name="test_db") as tmp_url:
         yield tmp_url
 
 
@@ -34,7 +34,8 @@ def postgres_engine_fixture(
     postgres: str,
 ) -> Iterator[Engine]:
     """
-    SQLAlchemy engine, bound to temporary database.
+    На вход принимается полностью сформированный тестовый URL
+    из предыдущей фикстуры и создается engine
     """
     engine = create_engine(postgres, echo=True)
     try:
@@ -46,6 +47,8 @@ def postgres_engine_fixture(
 @pytest.fixture(name="alembic_config")
 def alembic_config_fixture(postgres: str) -> Config:
     """
-    Alembic configuration object, bound to temporary database.
+    На вход принимаем полностью сформированный тестовый URL
+    и передается в функцию, которая преобразовывает alembic 
+    как тестовый для тестов с миграциями
     """
     return make_alembic_config(postgres, "app")

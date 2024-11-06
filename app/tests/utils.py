@@ -1,6 +1,3 @@
-import random
-import string
-import uuid
 from contextlib import asynccontextmanager, contextmanager
 from typing import AsyncIterator, Iterator
 from urllib.parse import urlsplit, urlunsplit
@@ -18,17 +15,13 @@ def make_alembic_config(
     dsn: str, script_location: str | None = None
 ) -> Config:
     """
-    Make alembic config for tests. Создается новый конфиг
-    для алембика,
-    потому что основной в енв подвязан под основую
-    БДб которая будет использоваться в проекте,
-    а нам нужна тестовая
-    project_config.ROOT_DIR - папка app
-    cначала формируем путь до алембик ини
-    потом подменяем тестинг на труб, а базовый
-    путь до сгенерированного
-    потом указываем папку для миграций, т.к. он сам не видит
-
+    Создается новый конфиг для алембика. По дефолту основной в конф.файл env.py
+    подвязан под основую БД, которая будет использоваться в проекте.
+    project_config.ROOT_DIR - папка app - cначала формируем путь до alembicini,
+    далее подменяем is_testing на True (по дефолту False), а базовый
+    URL sqlalchemy.url до сгенерированного нового (в фикстурах), в конце
+    указываем папку для миграций в script_location,
+    т.к. alembic сам не видит путь
     """
     alembic_cfg = Config(f"{project_config.ROOT_DIR}/alembic.ini")
     alembic_cfg.set_main_option("is_testing", "True")
@@ -47,17 +40,12 @@ def create_database(
     encoding: str = "utf8",
 ) -> None:
     """
-    Create database for tests
-    Создание БД с урлом, сформированным в контекстном
-    менеджере tmp_database
-    make_url формирует урл, который поймет алхимия
-    урл с постгрес существует всего, т.е. ее создавать
-    не нужно
+    Создание БД с URL, сформированным в tmp_database.
+    make_url формирует URL, который принимает SQLAlchemy
+    URL с "postgres" существует по дефолту, т.е. ее создавать
+    не нужно, можно подкючаться сразу через create_engine и создать движок.
     main_url содержит урл с именем постгрес для подкючения
-    к основной(дефолтной) БД, с помощью которой
-    создается движок
-    на базе этого движка создается тестовая БД
-
+    На основе этого движка создается БД с тестовым именем.
     """
     url_obj = make_url(url)
     main_url = url_obj._replace(database="postgres")
@@ -73,6 +61,9 @@ def create_database(
 
 
 def drop_database(url: str) -> None:
+    """
+    Функция для удаления тестовой БД
+    """
     url_obj = make_url(url)
     main_url = url_obj._replace(database="postgres")
     engine = sa.create_engine(main_url, isolation_level="AUTOCOMMIT")
@@ -95,7 +86,7 @@ async def async_create_database(
     encoding: str = "utf8",
 ) -> None:
     """
-    Create database for tests
+    Создание БД асинхронно, как в create_database
     """
     url_obj = make_url(url)
     main_url = url_obj._replace(database="postgres")
@@ -111,6 +102,9 @@ async def async_create_database(
 
 
 async def async_drop_database(url: str) -> None:
+    """
+    Удаление БД асинхронно, как в drop_database
+    """
     url_obj = make_url(url)
     main_url = url_obj._replace(database="postgres")
     engine = create_async_engine(main_url, isolation_level="AUTOCOMMIT")
@@ -128,23 +122,13 @@ async def async_drop_database(url: str) -> None:
 
 
 @contextmanager
-def tmp_database(
-    str_url: str, db_name: str = "", suffix: str = "", **kwargs
-) -> Iterator[str]:
-    """Формирование имени для тестовой БД для миграций,
-    на вход передали урл для подключения от фикстур"""
-    if db_name == "":
-        tmp_db_name = "_".join(
-            [
-                f"{random.choice(string.ascii_lowercase)}{uuid.uuid4().hex}",
-                "temp_db",
-                suffix,
-            ]
-        )
-    else:
-        tmp_db_name = db_name
+def tmp_database(str_url: str, db_name: str = "", **kwargs) -> Iterator[str]:
+    """
+    Формирование URL для тестовой БД для миграций,
+    на вход передается URL для подключения от фикстур
+    """
     tmp_db_url = urlsplit(str_url)
-    str_url = urlunsplit(tmp_db_url._replace(path=f"/{tmp_db_name}"))
+    str_url = urlunsplit(tmp_db_url._replace(path=f"/{db_name}"))
     create_database(str_url, **kwargs)
 
     try:
@@ -155,26 +139,19 @@ def tmp_database(
 
 @asynccontextmanager
 async def async_tmp_database(
-    str_url: str, db_name: str = "", suffix: str = "", **kwargs
+    str_url: str, db_name: str = "", **kwargs
 ) -> AsyncIterator[str]:
-    if db_name == "":
-        tmp_db_name = "_".join(
-            [
-                f"{random.choice(string.ascii_lowercase)}{uuid.uuid4().hex}",
-                "temp_db",
-                suffix,
-            ]
-        )
-    else:
-        tmp_db_name = db_name
+    """
+    Асинхронное формирование URL для тестовой БД для миграций,
+    на вход передается URL для подключения от фикстур
+    """
     tmp_db_url = urlsplit(str_url)
-    str_url = urlunsplit(tmp_db_url._replace(path=f"/{tmp_db_name}"))
+    str_url = urlunsplit(tmp_db_url._replace(path=f"/{db_name}"))
     try:
         await async_create_database(str_url, **kwargs)
     except ProgrammingError:
         await async_drop_database(str_url)
         await async_create_database(str_url, **kwargs)
-
     try:
         yield str_url
     finally:

@@ -1,4 +1,5 @@
-from typing import AsyncIterator
+from datetime import timedelta
+from typing import AsyncIterator, Type
 
 import pytest
 from fastapi import FastAPI
@@ -6,9 +7,11 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from core.dependency import get_session
+from core.security import create_access_token
 from core.settings import config
 from main import app
 from models import Base
+from tests.factory import MainFactory, UserFactory
 from tests.utils import async_tmp_database, create_async_engine
 
 
@@ -20,18 +23,18 @@ def anyio_backend():
 @pytest.fixture(scope="package", name="pg_url")
 def pg_url_fixture() -> str:
     """
-    Provides base PostgreSQL URL for creating temporary databases.
-    Фикстура для создания дсн-урла для тестовой БД с локалхостом
+    Формирование URL для тестовой БД с localhost
     """
     config.DB_HOST = "localhost"
     return config.async_dsn  # type: ignore[return-value]
 
 
-# Чем отлчаются эти две фикстуры? Первый это шаблон, а второй?
 @pytest.fixture(scope="package", autouse=True, name="postgres_temlate")
 async def postgres_temlate_fixture(pg_url: str) -> AsyncIterator[str]:
     """
-    Creates empty template database with migrations.
+    Создаем шаблонную БД с миграциями для создания других БД.
+    Миграции создаются в run_sync, вызывая metadata.create_all.
+    Эта БД создается один раз для всех тестов
     """
     async with async_tmp_database(pg_url, db_name="api_template") as tmp_url:
         engine = create_async_engine(tmp_url)
@@ -44,10 +47,11 @@ async def postgres_temlate_fixture(pg_url: str) -> AsyncIterator[str]:
 @pytest.fixture(name="postgres")
 async def postgres_fixture(postgres_temlate: str) -> AsyncIterator[str]:
     """
-    Creates empty temporary database.
+    На основе шаблона БД из предыдущей фикстуры, создается тестовая БД,
+    где уже есть все миграции
     """
     async with async_tmp_database(
-        postgres_temlate, suffix="api", template="api_template"
+        postgres_temlate, db_name="temp_db", template="api_template"
     ) as tmp_url:
         yield tmp_url
 
@@ -55,8 +59,7 @@ async def postgres_fixture(postgres_temlate: str) -> AsyncIterator[str]:
 @pytest.fixture(name="postgres_engine")
 async def postgres_engine_fixture(postgres: str) -> AsyncIterator[AsyncEngine]:
     """
-    SQLAlchemy async engine, bound to temporary database.
-    Фикстура для создания движка
+    Фикстура для создания engine
     """
     engine = create_async_engine(postgres, echo=True)  # type: ignore
     try:
@@ -70,25 +73,60 @@ async def async_session_fixture(
     postgres_engine: AsyncEngine,
 ) -> AsyncIterator[AsyncSession]:
     """
-    SQLAlchemy session bound to temporary database
+    Создание сессии с подключением к тестовой БД
     """
     async with AsyncSession(postgres_engine) as session:
         yield session
 
 
-# чтоделает?? ващщщще не понятно
 @pytest.fixture(name="test_app")
 async def test_app_fixture(
     async_session: AsyncSession,
 ) -> AsyncIterator[FastAPI]:
+    """
+    Подмена зависимостей основого приложение на тестовые
+    """
     app.dependency_overrides[get_session] = lambda: async_session
     yield app
     app.dependency_overrides = {}
 
 
-@pytest.fixture
-async def client(test_app: FastAPI) -> AsyncIterator[AsyncClient]:
+@pytest.fixture(name="client")
+async def client_fixture(test_app: FastAPI) -> AsyncIterator[AsyncClient]:
+    """
+    Создание клиента для отправки запросов без авторизации
+    """
     async with AsyncClient(
         transport=ASGITransport(app=test_app), base_url="http://test"
+    ) as async_client:
+        yield async_client
+
+
+@pytest.fixture(name="factory")
+async def factory_fixture(async_session: AsyncSession):
+    async def wrapper(cls: Type[MainFactory], count=1, **kwargs):
+        result = await cls(async_session).generate_data(count, **kwargs)
+        return result
+
+    return wrapper
+
+
+@pytest.fixture(name="user_client")
+async def user_client_fixture(
+    factory, test_app: FastAPI
+) -> AsyncIterator[AsyncClient]:
+    users = await factory(UserFactory, password="string123")
+    user = users[0]
+    access_token_expires = timedelta(
+        minutes=config.ACCESS_TOKEN_EXPIRE_MINUTES
+    )
+    token = create_access_token(
+        data={"sub": user.email},
+        expires_delta=access_token_expires,
+    )
+    async with AsyncClient(
+        transport=ASGITransport(app=test_app),
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {token}"},
     ) as async_client:
         yield async_client
