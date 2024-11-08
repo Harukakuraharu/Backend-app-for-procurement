@@ -26,7 +26,7 @@ class User(Base):
     addresses: Mapped[list["UserAddress"]] = relationship(
         back_populates="user", lazy="joined"
     )
-    # is_admin: Mapped[bool]
+    shop: Mapped["Shop"] = relationship(back_populates="user", lazy="joined")
 
 
 class Shop(Base):
@@ -34,7 +34,7 @@ class Shop(Base):
 
     id: Mapped[intpk]
     title: Mapped[str] = mapped_column(String(30))
-    url = Mapped[str]
+    url: Mapped[str]
     active: Mapped[bool] = mapped_column(server_default=false())
     user_id: Mapped[int] = mapped_column(
         ForeignKey("user.id", ondelete="CASCADE")
@@ -46,6 +46,7 @@ class Shop(Base):
     products: Mapped[list["Product"]] = relationship(  # type: ignore[name-defined]
         back_populates="shop", lazy="selectin"
     )
+    user: Mapped[User] = relationship(back_populates="shop", lazy="joined")
 
 
 class UserAddress(Base):
