@@ -10,8 +10,16 @@ from models.utils import intpk
 category_product = Table(
     "category_product",
     Base.metadata,
-    Column("category_id", ForeignKey("category.id"), primary_key=True),
-    Column("product_id", ForeignKey("product.id"), primary_key=True),
+    Column(
+        "category_id",
+        ForeignKey("category.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "product_id",
+        ForeignKey("product.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
 )
 
 
@@ -19,7 +27,7 @@ class Category(Base):
     __tablename__ = "category"
 
     id: Mapped[intpk]
-    title: Mapped[str]
+    title: Mapped[str] = mapped_column(String(15), unique=True)
     products: Mapped[list["Product"]] = relationship(
         back_populates="categories",
         lazy="selectin",
@@ -31,7 +39,7 @@ class Product(Base):
     __tablename__ = "product"
 
     id: Mapped[intpk]
-    name: Mapped[str] = mapped_column(String(30))
+    name: Mapped[str] = mapped_column(String(30), unique=True)
     price: Mapped[Decimal]
     remainder: Mapped[int]
     shop_id: Mapped[int] = mapped_column(
@@ -40,8 +48,11 @@ class Product(Base):
     shop: Mapped["Shop"] = relationship(  # type: ignore[name-defined]
         back_populates="products", lazy="joined"
     )
-    categories: Mapped[list["Category"]] = relationship(
+    categories: Mapped[list[Category]] = relationship(
         back_populates="products", lazy="selectin", secondary=category_product
+    )
+    parametrs: Mapped[list["ParametrProduct"]] = relationship(
+        back_populates="product", lazy="selectin"
     )
 
 
@@ -49,7 +60,7 @@ class Parametr(Base):
     __tablename__ = "parametr"
 
     id: Mapped[intpk]
-    name: Mapped[str] = mapped_column(String(15))
+    name: Mapped[str] = mapped_column(String(15), unique=True)
 
 
 class ParametrProduct(Base):
@@ -58,6 +69,9 @@ class ParametrProduct(Base):
     id: Mapped[intpk]
     product_id: Mapped[int] = mapped_column(
         ForeignKey("product.id", ondelete="CASCADE")
+    )
+    product: Mapped[Product] = relationship(
+        back_populates="parametrs", lazy="joined"
     )
     parametr_id: Mapped[int] = mapped_column(
         ForeignKey("parametr.id", ondelete="CASCADE")

@@ -20,9 +20,9 @@ class User(Base):
     id: Mapped[intpk]
     email: Mapped[str] = mapped_column(String(40), unique=True)
     password: Mapped[str] = mapped_column(String(72))
-    name: Mapped[str] = mapped_column(String(15))
+    name: Mapped[str | None] = mapped_column(String(15))
     status: Mapped[UserStatus]
-    phone: Mapped[str]
+    phone: Mapped[str | None]
     addresses: Mapped[list["UserAddress"]] = relationship(
         back_populates="user", lazy="joined"
     )
@@ -37,7 +37,7 @@ class Shop(Base):
     url: Mapped[str]
     active: Mapped[bool] = mapped_column(server_default=false())
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("user.id", ondelete="CASCADE")
+        ForeignKey("user.id", ondelete="CASCADE"), unique=True
     )
     created_at: Mapped[datetime.datetime] = mapped_column(
         server_default=func.now()  # pylint: disable=E1102

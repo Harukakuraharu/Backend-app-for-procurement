@@ -16,7 +16,7 @@ class Config(BaseSettings):
 
     SECRET_KEY: str = "fgdhghgdjhgh"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 100
 
     @computed_field
     def async_dsn(self) -> str:

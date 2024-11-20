@@ -63,3 +63,25 @@ class UserFactory(MainFactory):
         await self.insert_to_db()
         await self.session.commit()
         return await self.get_data()
+
+
+class ShopFactory(MainFactory):
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
+        self.model = models.Shop
+
+    async def generate_data(
+        self, count: int = 1, **kwargs
+    ) -> Sequence[models.Shop]:
+        self.data.extend(
+            {
+                "title": kwargs.get("title", faker.company()),
+                "url": kwargs.get("url", faker.url()),
+                "user_id": kwargs.get("user_id", 1),
+            }
+            for _ in range(count)
+        )
+
+        await self.insert_to_db()
+        await self.session.commit()
+        return await self.get_data()

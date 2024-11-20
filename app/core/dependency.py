@@ -7,8 +7,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
+import models
 from core.settings import config
-from models import User
 from schemas.products import UserResponse
 
 
@@ -23,7 +23,7 @@ AsyncSessionDependency = Annotated[
 
 
 async def get_user(session: AsyncSessionDependency, email: str):
-    stmt = sa.select(User).where(User.email == email)
+    stmt = sa.select(models.User).where(models.User.email == email)
     user = await session.scalar(stmt)
     return user
 

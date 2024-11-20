@@ -49,7 +49,7 @@ class UserCreate(User):
 
 
 class UserUpdate(BaseModel):
-    status: models.UserStatus
+    status: models.UserStatus | None = None
     name: str | None = None
     phone: str | None = None
 
@@ -69,7 +69,7 @@ class Shop(BaseModel):
     url: str
 
 
-class ShopProduct(Shop):
+class ShopForProduct(Shop):
     id: int
 
 
@@ -114,7 +114,12 @@ class Category(BaseModel):
 
 class CategoryResponse(Category):
     id: int
-    products: list["ProductResponse"]
+    products: list["ProductsResponse"]
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CategoryCreateResponse(Category):
+    id: int
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -129,16 +134,50 @@ class CategoryProduct(Category):
     id: int
 
 
+class ParametrProductCreate(BaseModel):
+    parametr_id: int
+    value: str
+
+
+class ParametrProductCreateResponse(ParametrProductCreate):
+    id: int
+    # product_id: int
+
+
 class ProductCreate(Product):
     categories: list[int]
+    parametrs: list[ParametrProductCreate]
     shop_id: int
 
 
-class ProductResponse(Product):
-    categories: list[CategoryProduct]
-    shop: "ShopProduct"
+class ProductsResponse(Product):
     id: int
+    categories: list[CategoryProduct]
+    shop: "ShopForProduct"
+    parametrs: list[ParametrProductCreateResponse]
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProductUpdate(BaseModel):
+    name: str | None = None
+    price: float | None = None
+    remainder: int | None = None
+    parametrs: list["ParametrProductUpdateResponse"] | None = None
+    categories: list[int] | None = None
+
+
+class ParametrProductUpdateResponse(BaseModel):
+    parametr_id: int | None = None
+    value: str | None = None
+
+
+class ProductParametrsDelete(BaseModel):
+    parametrs: list[int] | None = None
+    categories: list[int] | None = None
+
+
+class ParametrProductDeleteResponse(BaseModel):
+    parametr_id: int | None = None
 
 
 # parametr
@@ -152,10 +191,35 @@ class ParametrResponse(Parametr):
 
 
 class ParametrProduct(BaseModel):
+    parametr_id: int
+    product_id: int
+    value: str
+
+
+class ParametrProductForResponse(BaseModel):
     value: str
 
 
 class ParametrProductResponse(ParametrProduct):
-    product: list[Product]
-    parametr: list[Parametr]
+    id: int
     model_config = ConfigDict(from_attributes=True)
+
+
+class ParametrProductResponseParametr(ParametrProductForResponse):
+    parametr_id: int
+
+
+class ParametrProductCreateParametr(BaseModel):
+    id: int
+    product_id: int
+    value: str
+    parametr_id: int
+
+
+# orders
+class Order(BaseModel):
+    pass
+
+
+class OrderResponse(Order):
+    pass

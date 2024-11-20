@@ -106,6 +106,8 @@ async def client_fixture(test_app: FastAPI) -> AsyncIterator[AsyncClient]:
 async def factory_fixture(async_session: AsyncSession):
     async def wrapper(cls: Type[MainFactory], count=1, **kwargs):
         result = await cls(async_session).generate_data(count, **kwargs)
+        if len(result) == 1:
+            return result[0]
         return result
 
     return wrapper
@@ -115,8 +117,8 @@ async def factory_fixture(async_session: AsyncSession):
 async def user_client_fixture(
     factory, test_app: FastAPI
 ) -> AsyncIterator[AsyncClient]:
-    users = await factory(UserFactory, password="string123")
-    user = users[0]
+    user = await factory(UserFactory, password="string123")
+    # user = users[0]
     access_token_expires = timedelta(
         minutes=config.ACCESS_TOKEN_EXPIRE_MINUTES
     )

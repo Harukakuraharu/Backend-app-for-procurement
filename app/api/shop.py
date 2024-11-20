@@ -54,7 +54,7 @@ async def update_shop(
     return shop
 
 
-@shop_routers.delete("/delete/", response_model=schema.ShopResponse)
+@shop_routers.delete("/delete/")
 async def delete_shop(
     session: AsyncSessionDependency,
     user: GetCurrentUserDependency,

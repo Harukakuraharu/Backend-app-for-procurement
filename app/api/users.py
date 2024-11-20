@@ -19,7 +19,7 @@ from schemas import products as schema
 user_routers = APIRouter(prefix="/user", tags=["User"])
 
 
-@user_routers.post("/registration", response_model=schema.UserCreateResponse)
+@user_routers.post("/registration/", response_model=schema.UserCreateResponse)
 async def create_user(
     session: AsyncSessionDependency, data: schema.UserCreate
 ):
