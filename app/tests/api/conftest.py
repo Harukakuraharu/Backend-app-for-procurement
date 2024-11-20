@@ -11,7 +11,7 @@ from core.security import create_access_token
 from core.settings import config
 from main import app
 from models import Base
-from tests.factory import MainFactory, UserFactory
+from tests import factory as fc
 from tests.utils import async_tmp_database, create_async_engine
 
 
@@ -104,7 +104,7 @@ async def client_fixture(test_app: FastAPI) -> AsyncIterator[AsyncClient]:
 
 @pytest.fixture(name="factory")
 async def factory_fixture(async_session: AsyncSession):
-    async def wrapper(cls: Type[MainFactory], count=1, **kwargs):
+    async def wrapper(cls: Type[fc.MainFactory], count=1, **kwargs):
         result = await cls(async_session).generate_data(count, **kwargs)
         if len(result) == 1:
             return result[0]
@@ -113,11 +113,23 @@ async def factory_fixture(async_session: AsyncSession):
     return wrapper
 
 
+# @pytest.fixture(name="product_factory")
+# async def product_factory(async_session: AsyncSession, factory):
+#     users = await factory(fc.UserFactory, 5)
+#     for user in users:
+#         await async_session.refresh(user)
+#         shops = await factory(fc.ShopFactory, user_id=user.id)
+#     for shop in shops:
+#         await async_session.refresh(shop)
+#         product = await factory(fc.ProductFactory, shop_id=shop.id)
+#     return product
+
+
 @pytest.fixture(name="user_client")
 async def user_client_fixture(
     factory, test_app: FastAPI
 ) -> AsyncIterator[AsyncClient]:
-    user = await factory(UserFactory, password="string123")
+    user = await factory(fc.UserFactory, password="string123")
     # user = users[0]
     access_token_expires = timedelta(
         minutes=config.ACCESS_TOKEN_EXPIRE_MINUTES

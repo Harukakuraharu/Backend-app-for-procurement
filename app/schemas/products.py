@@ -141,12 +141,11 @@ class ParametrProductCreate(BaseModel):
 
 class ParametrProductCreateResponse(ParametrProductCreate):
     id: int
-    # product_id: int
 
 
 class ProductCreate(Product):
-    categories: list[int]
-    parametrs: list[ParametrProductCreate]
+    categories: list[int] | None
+    parametrs: list[ParametrProductCreate] | None
     shop_id: int
 
 

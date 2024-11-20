@@ -5,7 +5,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
-from tests.factory import ShopFactory
+from tests.factory import ShopFactory, UserFactory
 
 
 pytestmark = pytest.mark.anyio
@@ -25,14 +25,17 @@ async def test_create_shop_not_auth(client: AsyncClient):
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
-# async def test_get_all_shop(factory, client: AsyncClient):
-#     """Get list al shop"""
-#     users = await factory(UserFactory, 3)
-#     for user in users:
-#         await factory(ShopFactory, user_id=user.id)
-#     response = await client.get("/shop/")
-#     assert response.status_code == status.HTTP_200_OK
-#     assert len(response.json()) == 3
+async def test_get_all_shop(
+    factory, client: AsyncClient, async_session: AsyncSession
+):
+    """Get list al shop"""
+    users = await factory(UserFactory, 3)
+    for user in users:
+        await async_session.refresh(user)
+        await factory(ShopFactory, user_id=user.id)
+    response = await client.get("/shop/")
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.json()) == 3
 
 
 async def test_get_shop_by_id(

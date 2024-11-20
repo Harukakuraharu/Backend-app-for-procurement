@@ -1,20 +1,24 @@
 import sqlalchemy as sa
-from fastapi import HTTPException, status
+from fastapi import Depends, HTTPException, status
 from fastapi.routing import APIRouter
 
 import models
 from api import crud
-from core.dependency import AsyncSessionDependency, GetCurrentUserDependency
+from core import dependency
 from schemas import products as schema_product
 
 
 product_routers = APIRouter(prefix="/product", tags=["Product"])
 category_routers = APIRouter(prefix="/category", tags=["Category"])
-parametr_routers = APIRouter(prefix="/parametr", tags=["Parametr"])
+parametr_routers = APIRouter(
+    prefix="/parametr",
+    tags=["Parametr"],
+    dependencies=[Depends(dependency.get_current_user)],
+)
 
 
 @product_routers.get("/", response_model=list[schema_product.ProductsResponse])
-async def get_products(session: AsyncSessionDependency):
+async def get_products(session: dependency.AsyncSessionDependency):
     """Вывод списка всех товаров"""
     products = await crud.get_item(session, models.Product)
     return products
@@ -22,29 +26,31 @@ async def get_products(session: AsyncSessionDependency):
 
 @product_routers.post("/", response_model=schema_product.ProductsResponse)
 async def create_products(
-    session: AsyncSessionDependency,
+    session: dependency.AsyncSessionDependency,
     data: schema_product.ProductCreate,
-    user: GetCurrentUserDependency,
+    user: dependency.GetCurrentUserDependency,
 ):
     """Создание товара"""
     product_data = data.model_dump()
-    if product_data["shop_id"] == user.shop.id:  # type:ignore[attr-defined]
+    if product_data["shop_id"] == user.shop.id:  # type: ignore[attr-defined]
+        await session.flush()
         categories = product_data.pop("categories")
         parametrs = product_data.pop("parametrs")
-        stmt_cat = sa.select(models.Category).where(
-            models.Category.id.in_(categories)
-        )
-        categories_product = await session.scalars(stmt_cat)
         product = await crud.create_item(session, product_data, models.Product)
-        await session.flush()
-        product.categories = categories_product.all()
-        for parametr in parametrs:
-            parametr["product_id"] = product.id
+        if len(categories) > 1:
+            stmt_cat = sa.select(models.Category).where(
+                models.Category.id.in_(categories)
+            )
+            categories_product = await session.scalars(stmt_cat)
+            product.categories = categories_product.all()
+        if len(parametrs) > 1:
+            for parametr in parametrs:
+                parametr["product_id"] = product.id
 
-        stmt_paramert_product = sa.insert(models.ParametrProduct).values(
-            parametrs
-        )
-        await session.execute(stmt_paramert_product)
+            stmt_paramert_product = sa.insert(models.ParametrProduct).values(
+                parametrs
+            )
+            await session.execute(stmt_paramert_product)
         await session.commit()
         await session.refresh(product)
         return product
@@ -57,9 +63,9 @@ async def create_products(
 
 @product_routers.delete("/{product_id}")
 async def delete_products(
-    session: AsyncSessionDependency,
+    session: dependency.AsyncSessionDependency,
     product_id: int,
-    user: GetCurrentUserDependency,
+    user: dependency.GetCurrentUserDependency,
 ):
     """Удаление товара"""
     stmt = sa.select(models.Product).where(models.Product.id == product_id)
@@ -82,10 +88,10 @@ async def delete_products(
     "/{product_id}", response_model=schema_product.ProductsResponse
 )
 async def update_product(  # pylint: disable=R0914
-    session: AsyncSessionDependency,
+    session: dependency.AsyncSessionDependency,
     data: schema_product.ProductUpdate,
     product_id: int,
-    user: GetCurrentUserDependency,
+    user: dependency.GetCurrentUserDependency,
 ):
     """Изменение товара"""
     update_data = data.model_dump(exclude_unset=True)
@@ -154,10 +160,10 @@ async def update_product(  # pylint: disable=R0914
     "parametrs/{product_id}", response_model=schema_product.ProductsResponse
 )
 async def delete_parametrs_product(
-    session: AsyncSessionDependency,
+    session: dependency.AsyncSessionDependency,
     data: schema_product.ProductParametrsDelete,
     product_id: int,
-    user: GetCurrentUserDependency,
+    user: dependency.GetCurrentUserDependency,
 ):
     """Удаление категории и параметров у товара"""
     update_data = data.model_dump(exclude_unset=True)
@@ -190,10 +196,12 @@ async def delete_parametrs_product(
 
 
 @category_routers.post(
-    "/", response_model=schema_product.CategoryCreateResponse
+    "/",
+    response_model=schema_product.CategoryCreateResponse,
+    dependencies=[Depends(dependency.get_current_user)],
 )
 async def create_category(
-    session: AsyncSessionDependency, data: schema_product.Category
+    session: dependency.AsyncSessionDependency, data: schema_product.Category
 ):
     """Создание категории"""
     category_data = data.model_dump()
@@ -203,10 +211,19 @@ async def create_category(
     return category
 
 
+@category_routers.get(
+    "/", response_model=list[schema_product.CategoryResponse]
+)
+async def get_categories(session: dependency.AsyncSessionDependency):
+    categories = await crud.get_item(session, models.Category)
+    return categories
+
+
 @parametr_routers.post("/", response_model=schema_product.ParametrResponse)
 async def create_parametr(
-    session: AsyncSessionDependency, data: schema_product.Parametr
+    session: dependency.AsyncSessionDependency, data: schema_product.Parametr
 ):
+    """Create parametrs fields"""
     parametr_data = data.model_dump()
     parametr = await crud.create_item(session, parametr_data, models.Parametr)
     await session.commit()
@@ -215,9 +232,17 @@ async def create_parametr(
 
 
 @parametr_routers.get(
+    "/", response_model=list[schema_product.ParametrResponse]
+)
+async def get_parametrs(session: dependency.AsyncSessionDependency):
+    categories = await crud.get_item(session, models.Parametr)
+    return categories
+
+
+@parametr_routers.get(
     "/", response_model=list[schema_product.ParametrProductResponse]
 )
-async def get_parametrs_product(session: AsyncSessionDependency):
+async def get_parametrs_product(session: dependency.AsyncSessionDependency):
     """Вывод списка всех полей для всех товаров"""
     parametrs = await crud.get_item(session, models.ParametrProduct)
     return parametrs
@@ -226,7 +251,7 @@ async def get_parametrs_product(session: AsyncSessionDependency):
 @parametr_routers.get(
     "/field", response_model=list[schema_product.ParametrResponse]
 )
-async def get_parametrs_field(session: AsyncSessionDependency):
+async def get_parametrs_field(session: dependency.AsyncSessionDependency):
     """Вывод списка всех полей для всех товаров"""
     parametrs = await crud.get_item(session, models.Parametr)
     return parametrs

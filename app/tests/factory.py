@@ -85,3 +85,87 @@ class ShopFactory(MainFactory):
         await self.insert_to_db()
         await self.session.commit()
         return await self.get_data()
+
+
+class ProductFactory(MainFactory):
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
+        self.model = models.Product
+
+    async def generate_data(
+        self, count: int = 1, **kwargs
+    ) -> Sequence[models.Product]:
+        self.data.extend(
+            {
+                "name": kwargs.get("name", faker.company()),
+                "price": kwargs.get("price", faker.numerify()),
+                "remainder": kwargs.get("remainder", 10),
+                "shop_id": kwargs.get("shop_id", 1),
+            }
+            for _ in range(count)
+        )
+
+        await self.insert_to_db()
+        await self.session.commit()
+        return await self.get_data()
+
+
+class CategoryFactory(MainFactory):
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
+        self.model = models.Category
+
+    async def generate_data(
+        self, count: int = 1, **kwargs
+    ) -> Sequence[models.Category]:
+        self.data.extend(
+            {
+                "title": kwargs.get("title", faker.first_name()),
+            }
+            for _ in range(count)
+        )
+
+        await self.insert_to_db()
+        await self.session.commit()
+        return await self.get_data()
+
+
+class ParametrFactory(MainFactory):
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
+        self.model = models.Parametr
+
+    async def generate_data(
+        self, count: int = 1, **kwargs
+    ) -> Sequence[models.Parametr]:
+        self.data.extend(
+            {
+                "name": kwargs.get("name", faker.first_name()),
+            }
+            for _ in range(count)
+        )
+
+        await self.insert_to_db()
+        await self.session.commit()
+        return await self.get_data()
+
+
+class ParametrProductFactory(MainFactory):
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
+        self.model = models.ParametrProduct
+
+    async def generate_data(
+        self, count: int = 1, **kwargs
+    ) -> Sequence[models.ParametrProduct]:
+        self.data.extend(
+            {
+                "product_id": kwargs.get("product_id", 1),
+                "parametr_id": kwargs.get("parametr_id", 1),
+            }
+            for _ in range(count)
+        )
+
+        await self.insert_to_db()
+        await self.session.commit()
+        return await self.get_data()
