@@ -7,12 +7,13 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from core.dependency import get_session
+from core.redis_cli import redis_client
 from core.security import create_access_token
 from core.settings import config
 from main import app
 from models import Base
 from tests import factory as fc
-from tests.utils import async_tmp_database, create_async_engine
+from tests import utils
 
 
 @pytest.fixture(scope="package")
@@ -36,8 +37,10 @@ async def postgres_temlate_fixture(pg_url: str) -> AsyncIterator[str]:
     Миграции создаются в run_sync, вызывая metadata.create_all.
     Эта БД создается один раз для всех тестов
     """
-    async with async_tmp_database(pg_url, db_name="api_template") as tmp_url:
-        engine = create_async_engine(tmp_url)
+    async with utils.async_tmp_database(
+        pg_url, db_name="api_template"
+    ) as tmp_url:
+        engine = utils.create_async_engine(tmp_url)
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         await engine.dispose()
@@ -50,7 +53,7 @@ async def postgres_fixture(postgres_temlate: str) -> AsyncIterator[str]:
     На основе шаблона БД из предыдущей фикстуры, создается тестовая БД,
     где уже есть все миграции
     """
-    async with async_tmp_database(
+    async with utils.async_tmp_database(
         postgres_temlate, db_name="temp_db", template="api_template"
     ) as tmp_url:
         yield tmp_url
@@ -61,7 +64,7 @@ async def postgres_engine_fixture(postgres: str) -> AsyncIterator[AsyncEngine]:
     """
     Фикстура для создания engine
     """
-    engine = create_async_engine(postgres, echo=True)  # type: ignore
+    engine = utils.create_async_engine(postgres, echo=True)  # type: ignore
     try:
         yield engine
     finally:
@@ -113,18 +116,6 @@ async def factory_fixture(async_session: AsyncSession):
     return wrapper
 
 
-# @pytest.fixture(name="product_factory")
-# async def product_factory(async_session: AsyncSession, factory):
-#     users = await factory(fc.UserFactory, 5)
-#     for user in users:
-#         await async_session.refresh(user)
-#         shops = await factory(fc.ShopFactory, user_id=user.id)
-#     for shop in shops:
-#         await async_session.refresh(shop)
-#         product = await factory(fc.ProductFactory, shop_id=shop.id)
-#     return product
-
-
 @pytest.fixture(name="user_client")
 async def user_client_fixture(
     factory, test_app: FastAPI
@@ -144,3 +135,9 @@ async def user_client_fixture(
         headers={"Authorization": f"Bearer {token}"},
     ) as async_client:
         yield async_client
+
+
+@pytest.fixture(name="clear_redis")
+async def clear_redis_fixture():
+    yield
+    redis_client.delete(*redis_client.keys())

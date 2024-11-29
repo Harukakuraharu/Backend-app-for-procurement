@@ -2,7 +2,8 @@ import pytest
 from fastapi import status
 from httpx import AsyncClient
 
-from tests.factory import UserFactory
+import models
+from tests.factory import UserAddressFactory, UserFactory
 
 
 pytestmark = pytest.mark.anyio
@@ -70,10 +71,11 @@ async def test_auth_user_with_invalid_password(client: AsyncClient, factory):
 
 async def test_get_users(user_client: AsyncClient, factory):
     """Get all buyer"""
-    users = await factory(UserFactory, 10)
+    buyer_count = 10
+    await factory(UserFactory, buyer_count, status=models.UserStatus.BUYER)
     response = await user_client.get("/user/buyer/")
     assert response.status_code == status.HTTP_200_OK
-    assert len(users) == len(response.json())
+    assert len(response.json()) == buyer_count
 
 
 async def test_get_current_user(user_client: AsyncClient):
@@ -109,3 +111,37 @@ async def test_get_user_id(client: AsyncClient, factory):
     response = await client.get(f"user/{user.id}")
     assert response.status_code == status.HTTP_200_OK
     assert response.json().get("name") == name
+
+
+async def test_create_address(user_client: AsyncClient):
+    """Create address for current user"""
+    data_1 = {
+        "city": "Tula",
+        "address": "address, 5",
+    }
+    data_2 = {
+        "city": "Tula",
+        "address": "address, 6",
+    }
+    response = await user_client.post("user/me/address", json=data_1)
+    assert response.status_code == status.HTTP_200_OK
+    response = await user_client.post("user/me/address", json=data_2)
+    assert response.status_code == status.HTTP_200_OK
+
+
+async def test_update_address(user_client: AsyncClient, factory):
+    """Update address for current user"""
+    address = await factory(UserAddressFactory)
+    update_data = {"city": "Pskov"}
+    response = await user_client.patch(
+        f"user/me/address/{address.id}", json=update_data
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["city"] == update_data["city"]
+
+
+async def test_delete_address(user_client: AsyncClient, factory):
+    """Delete address for current user"""
+    address = await factory(UserAddressFactory)
+    response = await user_client.delete(f"user/me/address/{address.id}")
+    assert response.status_code == status.HTTP_200_OK

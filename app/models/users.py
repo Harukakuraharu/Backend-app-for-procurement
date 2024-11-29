@@ -1,7 +1,7 @@
 import datetime
 import enum
 
-from sqlalchemy import ForeignKey, String, false, func
+from sqlalchemy import ForeignKey, String, func, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import Base
@@ -27,6 +27,9 @@ class User(Base):
         back_populates="user", lazy="joined"
     )
     shop: Mapped["Shop"] = relationship(back_populates="user", lazy="joined")
+    orders: Mapped[list["Order"]] = relationship(  # type: ignore[name-defined]
+        back_populates="user", lazy="selectin"
+    )
 
 
 class Shop(Base):
@@ -34,8 +37,8 @@ class Shop(Base):
 
     id: Mapped[intpk]
     title: Mapped[str] = mapped_column(String(30))
-    url: Mapped[str]
-    active: Mapped[bool] = mapped_column(server_default=false())
+    url: Mapped[str | None]
+    active: Mapped[bool] = mapped_column(server_default=true())
     user_id: Mapped[int] = mapped_column(
         ForeignKey("user.id", ondelete="CASCADE"), unique=True
     )

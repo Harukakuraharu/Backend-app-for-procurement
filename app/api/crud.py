@@ -22,6 +22,12 @@ async def create_item(
         response = await session.scalar(stmt)
         await session.flush()
     except IntegrityError as error:
+        # pylint: disable=C0301
+        if "fk_shoppingcart_product_id_product" in error.orig.args[0]:  # type: ignore[union-attr]
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                "Product not exists",
+            ) from error
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             f"{model.__name__} already exists",

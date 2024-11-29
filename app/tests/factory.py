@@ -55,7 +55,29 @@ class UserFactory(MainFactory):
                 ),
                 "name": kwargs.get("name", faker.first_name()),
                 "phone": kwargs.get("phone", faker.phone_number()),
-                "status": kwargs.get("status", models.UserStatus.BUYER),
+                "status": kwargs.get("status", models.UserStatus.SHOP),
+            }
+            for _ in range(count)
+        )
+
+        await self.insert_to_db()
+        await self.session.commit()
+        return await self.get_data()
+
+
+class UserAddressFactory(MainFactory):
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
+        self.model = models.UserAddress
+
+    async def generate_data(
+        self, count: int = 1, **kwargs
+    ) -> Sequence[models.UserAddress]:
+        self.data.extend(
+            {
+                "city": kwargs.get("city", faker.city()),
+                "address": kwargs.get("address", faker.address()),
+                "user_id": kwargs.get("user_id", 1),
             }
             for _ in range(count)
         )

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import computed_field
+from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings
 
 
@@ -17,6 +17,23 @@ class Config(BaseSettings):
     SECRET_KEY: str = "fgdhghgdjhgh"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 100
+
+    REDIS_HOST: str = "localhost"
+
+    CORP_EMAIL: str = Field(default="")
+    CORP_HOST: str = Field(default="")
+    CORP_PORT: int = Field(default=0)
+    CORP_KEY: str = Field(default="")
+
+    @computed_field
+    def redis_url(self) -> str:
+        """Формирование url для redis"""
+        return f"redis://{self.REDIS_HOST}:6379/1"
+
+    @computed_field
+    def celery_url(self) -> str:
+        """Формирование url для redis"""
+        return f"redis://{self.REDIS_HOST}:6379/2"
 
     @computed_field
     def async_dsn(self) -> str:

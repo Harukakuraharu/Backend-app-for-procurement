@@ -3,9 +3,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.routing import APIRouter
 
 import models
-from api import crud
+from api import crud, utils
 from core import dependency
-from schemas import products as schema_product
+from schemas import schemas
 
 
 product_routers = APIRouter(prefix="/product", tags=["Product"])
@@ -17,33 +17,41 @@ parametr_routers = APIRouter(
 )
 
 
-@product_routers.get("/", response_model=list[schema_product.ProductsResponse])
+@product_routers.get("/", response_model=list[schemas.ProductsResponse])
 async def get_products(session: dependency.AsyncSessionDependency):
     """Вывод списка всех товаров"""
     products = await crud.get_item(session, models.Product)
     return products
 
 
-@product_routers.post("/", response_model=schema_product.ProductsResponse)
+@product_routers.post("/", response_model=schemas.ProductsResponse)
 async def create_products(
     session: dependency.AsyncSessionDependency,
-    data: schema_product.ProductCreate,
+    data: schemas.ProductCreate,
     user: dependency.GetCurrentUserDependency,
 ):
     """Создание товара"""
     product_data = data.model_dump()
-    if product_data["shop_id"] == user.shop.id:  # type: ignore[attr-defined]
+    shop = await session.scalar(
+        sa.select(models.Shop).where(models.Shop.id == product_data["shop_id"])
+    )
+    if shop.active is False:  # type: ignore[union-attr]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Shop would be active",
+        )
+    if product_data["shop_id"] == user.shop.id:  # type: ignore[union-attr]
         await session.flush()
         categories = product_data.pop("categories")
         parametrs = product_data.pop("parametrs")
         product = await crud.create_item(session, product_data, models.Product)
-        if len(categories) > 1:
+        if len(categories) >= 1:
             stmt_cat = sa.select(models.Category).where(
                 models.Category.id.in_(categories)
             )
             categories_product = await session.scalars(stmt_cat)
             product.categories = categories_product.all()
-        if len(parametrs) > 1:
+        if len(parametrs) >= 1:
             for parametr in parametrs:
                 parametr["product_id"] = product.id
 
@@ -68,44 +76,25 @@ async def delete_products(
     user: dependency.GetCurrentUserDependency,
 ):
     """Удаление товара"""
-    stmt = sa.select(models.Product).where(models.Product.id == product_id)
-    product = await session.scalar(stmt)
-    if product is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Product is not exists",
-        )
-    if product.shop.user_id != user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="It is not your product",
-        )
+    product = await crud.get_item_id(session, models.Product, product_id)
+    await utils.check_owner_product(user.id, product)
     await crud.delete_item(session, models.Product, product.id)
     return {"status": "Successfully deleted"}
 
 
 @product_routers.patch(
-    "/{product_id}", response_model=schema_product.ProductsResponse
+    "/{product_id}", response_model=schemas.ProductsResponse
 )
 async def update_product(  # pylint: disable=R0914
     session: dependency.AsyncSessionDependency,
-    data: schema_product.ProductUpdate,
+    data: schemas.ProductUpdate,
     product_id: int,
     user: dependency.GetCurrentUserDependency,
 ):
     """Изменение товара"""
     update_data = data.model_dump(exclude_unset=True)
     product = await crud.get_item_id(session, models.Product, product_id)
-    if product is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Product is not exists",
-        )
-    if product.shop.user_id != user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="It is not your product",
-        )
+    await utils.check_owner_product(user.id, product)
     if update_data.get("categories"):
         categories = update_data.pop("categories")
         stmt_cat = sa.select(models.Category).where(
@@ -156,29 +145,19 @@ async def update_product(  # pylint: disable=R0914
     return product
 
 
-@product_routers.delete(
-    "parametrs/{product_id}", response_model=schema_product.ProductsResponse
+@product_routers.patch(
+    "/parametrs/{product_id}", response_model=schemas.ProductsResponse
 )
 async def delete_parametrs_product(
     session: dependency.AsyncSessionDependency,
-    data: schema_product.ProductParametrsDelete,
+    data: schemas.ProductParametrsDelete,
     product_id: int,
     user: dependency.GetCurrentUserDependency,
 ):
     """Удаление категории и параметров у товара"""
     update_data = data.model_dump(exclude_unset=True)
-    stmt = sa.select(models.Product).where(models.Product.id == product_id)
-    product = await session.scalar(stmt)
-    if product is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Product is not exists",
-        )
-    if product.shop.user_id != user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="It is not your product",
-        )
+    product = await crud.get_item_id(session, models.Product, product_id)
+    await utils.check_owner_product(user.id, product)
 
     if update_data.get("categories"):
         categories = update_data.pop("categories")
@@ -197,11 +176,11 @@ async def delete_parametrs_product(
 
 @category_routers.post(
     "/",
-    response_model=schema_product.CategoryCreateResponse,
+    response_model=schemas.CategoryCreateResponse,
     dependencies=[Depends(dependency.get_current_user)],
 )
 async def create_category(
-    session: dependency.AsyncSessionDependency, data: schema_product.Category
+    session: dependency.AsyncSessionDependency, data: schemas.Category
 ):
     """Создание категории"""
     category_data = data.model_dump()
@@ -211,17 +190,15 @@ async def create_category(
     return category
 
 
-@category_routers.get(
-    "/", response_model=list[schema_product.CategoryResponse]
-)
+@category_routers.get("/", response_model=list[schemas.CategoryResponse])
 async def get_categories(session: dependency.AsyncSessionDependency):
     categories = await crud.get_item(session, models.Category)
     return categories
 
 
-@parametr_routers.post("/", response_model=schema_product.ParametrResponse)
+@parametr_routers.post("/", response_model=schemas.ParametrResponse)
 async def create_parametr(
-    session: dependency.AsyncSessionDependency, data: schema_product.Parametr
+    session: dependency.AsyncSessionDependency, data: schemas.Parametr
 ):
     """Create parametrs fields"""
     parametr_data = data.model_dump()
@@ -231,27 +208,7 @@ async def create_parametr(
     return parametr
 
 
-@parametr_routers.get(
-    "/", response_model=list[schema_product.ParametrResponse]
-)
+@parametr_routers.get("/", response_model=list[schemas.ParametrResponse])
 async def get_parametrs(session: dependency.AsyncSessionDependency):
     categories = await crud.get_item(session, models.Parametr)
     return categories
-
-
-@parametr_routers.get(
-    "/", response_model=list[schema_product.ParametrProductResponse]
-)
-async def get_parametrs_product(session: dependency.AsyncSessionDependency):
-    """Вывод списка всех полей для всех товаров"""
-    parametrs = await crud.get_item(session, models.ParametrProduct)
-    return parametrs
-
-
-@parametr_routers.get(
-    "/field", response_model=list[schema_product.ParametrResponse]
-)
-async def get_parametrs_field(session: dependency.AsyncSessionDependency):
-    """Вывод списка всех полей для всех товаров"""
-    parametrs = await crud.get_item(session, models.Parametr)
-    return parametrs

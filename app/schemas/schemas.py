@@ -1,5 +1,5 @@
 import datetime
-from typing import Annotated
+from typing import Annotated, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from pydantic.functional_validators import AfterValidator
@@ -26,6 +26,11 @@ class UserAddressResponse(UserAddress):
     model_config = ConfigDict(from_attributes=True)
 
 
+class UserAddressUpdate(BaseModel):
+    city: str | None = None
+    address: str | None = None
+
+
 class User(BaseModel):
     email: EmailStr
     status: models.UserStatus
@@ -36,6 +41,7 @@ class User(BaseModel):
 class UserResponse(User):
     id: int
     addresses: list[UserAddressResponse]
+    shop: Optional["ShopCreateResponse"]
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -63,10 +69,18 @@ class UserLogin(BaseModel):
     password: str
 
 
+class PasswordReset(BaseModel):
+    email: EmailStr
+
+
+class PasswordUpdate(BaseModel):
+    password: Password
+
+
 # shop
 class Shop(BaseModel):
     title: str
-    url: str
+    url: str | None = None
 
 
 class ShopForProduct(Shop):
@@ -75,7 +89,7 @@ class ShopForProduct(Shop):
 
 class ShopCreateResponse(Shop):
     id: int
-    active: bool = False
+    active: bool = True
     created_at: datetime.datetime
     model_config = ConfigDict(from_attributes=True)
 
@@ -216,9 +230,33 @@ class ParametrProductCreateParametr(BaseModel):
 
 
 # orders
-class Order(BaseModel):
-    pass
+class OrderCreate(BaseModel):
+    address: int
 
 
-class OrderResponse(Order):
-    pass
+class OrderResponse(BaseModel):
+    id: int
+    created_at: datetime.datetime
+    status: models.OrderStatus = models.OrderStatus.INPROGRES
+    user_id: int
+    orderlist: list["OrderList"]
+    model_config = ConfigDict(from_attributes=True)
+
+
+class OrderUpdate(BaseModel):
+    status: models.OrderStatus
+
+
+class OrderList(BaseModel):
+    # product_id: int
+    quantity: int
+    product: ProductsResponse
+
+
+class OrderProduct(BaseModel):
+    product_id: int
+    quantity: int = Field(ge=0)
+
+
+class OrderProductResponse(OrderProduct):
+    model_config = ConfigDict(from_attributes=True)

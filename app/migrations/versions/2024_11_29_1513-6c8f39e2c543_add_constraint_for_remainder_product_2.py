@@ -1,8 +1,8 @@
-"""Added relationship for products with parametr
+"""add constraint for remainder product 2
 
-Revision ID: 720c84b949fb
-Revises: 80294b9b7763
-Create Date: 2024-11-19 03:41:06.507812
+Revision ID: 6c8f39e2c543
+Revises: 68517ea173eb
+Create Date: 2024-11-29 15:13:20.716938
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '720c84b949fb'
-down_revision: Union[str, None] = '80294b9b7763'
+revision: str = '6c8f39e2c543'
+down_revision: Union[str, None] = '68517ea173eb'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

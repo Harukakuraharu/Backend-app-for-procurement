@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 import models
 from core.settings import config
-from schemas.products import UserResponse
+from schemas.schemas import UserResponse
 
 
 async def get_session():

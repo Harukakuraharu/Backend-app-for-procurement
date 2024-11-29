@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from sqlalchemy import Column, ForeignKey, String, Table
+from sqlalchemy import CheckConstraint, Column, ForeignKey, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import Base
@@ -27,7 +27,7 @@ class Category(Base):
     __tablename__ = "category"
 
     id: Mapped[intpk]
-    title: Mapped[str] = mapped_column(String(15), unique=True)
+    title: Mapped[str] = mapped_column(String(30), unique=True)
     products: Mapped[list["Product"]] = relationship(
         back_populates="categories",
         lazy="selectin",
@@ -39,7 +39,7 @@ class Product(Base):
     __tablename__ = "product"
 
     id: Mapped[intpk]
-    name: Mapped[str] = mapped_column(String(30), unique=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
     price: Mapped[Decimal]
     remainder: Mapped[int]
     shop_id: Mapped[int] = mapped_column(
@@ -54,13 +54,26 @@ class Product(Base):
     parametrs: Mapped[list["ParametrProduct"]] = relationship(
         back_populates="product", lazy="selectin"
     )
+    # pylint: disable=C0301
+    orderlist: Mapped[list["OrderList"]] = relationship(  # type: ignore[name-defined]
+        back_populates="product", lazy="selectin"
+    )
+    __table_args__ = (CheckConstraint("remainder > 0", name="remainder_gt_0"),)
+
+    def __repr__(self) -> str:
+        return (
+            f"product_id - {self.id}, "
+            f"name - {self.name}, "
+            f"remainder - {self.remainder}, "
+            f"shop_id - {self.shop_id}"
+        )
 
 
 class Parametr(Base):
     __tablename__ = "parametr"
 
     id: Mapped[intpk]
-    name: Mapped[str] = mapped_column(String(15), unique=True)
+    name: Mapped[str] = mapped_column(String(50), unique=True)
 
 
 class ParametrProduct(Base):

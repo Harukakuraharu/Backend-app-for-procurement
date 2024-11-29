@@ -29,6 +29,7 @@ async def test_get_all_products(
 
 
 async def test_create_product(factory, user_client: AsyncClient):
+    """Create product without categories and parametrs"""
     shop = await factory(fc.ShopFactory)
     data = {
         "name": "Moana",
@@ -42,20 +43,30 @@ async def test_create_product(factory, user_client: AsyncClient):
     assert response.status_code == status.HTTP_200_OK
 
 
-async def test_delete_products(
+async def test_create_full_products(
     factory, user_client: AsyncClient, async_session: AsyncSession
 ):
+    """Create product with categories and parametrs"""
     shop = await factory(fc.ShopFactory)
-    product = await factory(fc.ProductFactory, shop_id=shop.id)
-    response = await user_client.delete(f"/product/{product.id}")
+    categories = await factory(fc.CategoryFactory)
+    parametrs = await factory(fc.ParametrFactory)
+    await async_session.refresh(categories)
+    await async_session.refresh(parametrs)
+    await async_session.refresh(shop)
+    data = {
+        "name": "New product",
+        "price": 10,
+        "remainder": 15,
+        "categories": [categories.id],
+        "parametrs": [{"parametr_id": parametrs.id, "value": "1000"}],
+        "shop_id": shop.id,
+    }
+    response = await user_client.post("/product/", json=data)
     assert response.status_code == status.HTTP_200_OK
-    obj = await async_session.scalar(
-        sa.select(models.Product).where(models.Product.id == product.id)
-    )
-    assert obj is None
 
 
 async def test_main_update_product(factory, user_client: AsyncClient):
+    """Update product without categories and products"""
     shop = await factory(fc.ShopFactory)
     product = await factory(fc.ProductFactory, shop_id=shop.id)
     update_data = {
@@ -66,6 +77,79 @@ async def test_main_update_product(factory, user_client: AsyncClient):
     )
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["price"] == update_data["price"]
+
+
+async def test_update_product(
+    factory, user_client: AsyncClient, async_session: AsyncSession
+):
+    """Update product with categories and products"""
+    await factory(fc.ShopFactory)
+    category = await factory(fc.CategoryFactory)
+    parametr = await factory(fc.ParametrFactory)
+    product = await factory(fc.ProductFactory)
+    await async_session.refresh(category)
+    await async_session.refresh(parametr)
+
+    assert len(product.categories) == 0
+    assert len(product.parametrs) == 0
+
+    update_data = {
+        "categories": [category.id],
+        "parametrs": [{"parametr_id": parametr.id, "value": "10"}],
+    }
+    response = await user_client.patch(
+        f"/product/{product.id}", json=update_data
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert product.categories is not None
+    assert product.parametrs is not None
+
+
+async def test_delete_products(
+    factory, user_client: AsyncClient, async_session: AsyncSession
+):
+    """Delete product"""
+    shop = await factory(fc.ShopFactory)
+    product = await factory(fc.ProductFactory, shop_id=shop.id)
+    response = await user_client.delete(f"/product/{product.id}")
+    assert response.status_code == status.HTTP_200_OK
+    obj = await async_session.scalar(
+        sa.select(models.Product).where(models.Product.id == product.id)
+    )
+    assert obj is None
+
+
+async def test_delete_parametrs_product(
+    factory, user_client: AsyncClient, async_session: AsyncSession
+):
+    """Delete categories or parametrs for product"""
+    await factory(fc.ShopFactory)
+    category = await factory(fc.CategoryFactory)
+    parametr = await factory(fc.ParametrFactory)
+    product = await factory(fc.ProductFactory)
+    await async_session.refresh(category)
+    await async_session.refresh(parametr)
+
+    update_data = {
+        "categories": [category.id],
+        "parametrs": [{"parametr_id": parametr.id, "value": "10"}],
+    }
+    response = await user_client.patch(
+        f"/product/{product.id}", json=update_data
+    )
+    await async_session.refresh(category)
+    await async_session.refresh(parametr)
+
+    delete_data = {
+        "parametrs": [category.id],
+        "categories": [parametr.id],
+    }
+    response = await user_client.patch(
+        f"/product/parametrs/{product.id}", json=delete_data
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(product.categories) == 0
+    assert len(product.parametrs) == 0
 
 
 async def test_get_category(factory, user_client: AsyncClient):
@@ -127,11 +211,3 @@ async def test_create_parametr_not_auth(client: AsyncClient):
     }
     response = await client.post("/parametr/", json=data)
     assert response.status_code == status.HTTP_403_FORBIDDEN
-
-
-# async def test_delete_parametrs_product(factory, user_client: AsyncClient):
-#     shop = await factory(fc.ShopFactory)
-#     product = await factory(fc.ProductFactory, shop_id=shop.id)
-#     update_data = {
-#         "categories": [],
-#     }

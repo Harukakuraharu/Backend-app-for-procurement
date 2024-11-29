@@ -1,8 +1,8 @@
-"""add lazy
+"""fix shop model
 
-Revision ID: f97bb3b88a00
-Revises: 07e3b7e3d524
-Create Date: 2024-11-20 11:32:16.252713
+Revision ID: ec6de30ece33
+Revises: d2c41013ed49
+Create Date: 2024-11-27 19:54:12.811054
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'f97bb3b88a00'
-down_revision: Union[str, None] = '07e3b7e3d524'
+revision: str = 'ec6de30ece33'
+down_revision: Union[str, None] = 'd2c41013ed49'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
