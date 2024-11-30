@@ -52,7 +52,7 @@ async def test_auth_user(client: AsyncClient, factory):
         "email": user.email,
         "password": password,
     }
-    response = await client.post("/user/auth", json=data)
+    response = await client.post("/user/auth/", json=data)
     assert response.status_code == status.HTTP_200_OK
     assert "access_token" in response.json()
 
@@ -65,7 +65,7 @@ async def test_auth_user_with_invalid_password(client: AsyncClient, factory):
         "email": user.email,
         "password": "string12345",
     }
-    response = await client.post("/user/auth", json=data)
+    response = await client.post("/user/auth/", json=data)
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
@@ -123,9 +123,9 @@ async def test_create_address(user_client: AsyncClient):
         "city": "Tula",
         "address": "address, 6",
     }
-    response = await user_client.post("user/me/address", json=data_1)
+    response = await user_client.post("user/me/address/", json=data_1)
     assert response.status_code == status.HTTP_200_OK
-    response = await user_client.post("user/me/address", json=data_2)
+    response = await user_client.post("user/me/address/", json=data_2)
     assert response.status_code == status.HTTP_200_OK
 
 

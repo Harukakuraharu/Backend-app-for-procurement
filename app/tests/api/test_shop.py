@@ -64,7 +64,7 @@ async def test_update_shop(user_client: AsyncClient, factory):
     """Update info field for youself shop"""
     await factory(ShopFactory)
     update_data = {"title": "New title"}
-    response = await user_client.patch("/shop/update/", json=update_data)
+    response = await user_client.patch("/shop/me/", json=update_data)
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["title"] == update_data["title"]
 
@@ -74,7 +74,7 @@ async def test_delete_shop(
 ):
     """Delete youself shop"""
     shop = await factory(ShopFactory)
-    response = await user_client.delete("/shop/delete/")
+    response = await user_client.delete("/shop/me/")
     assert response.status_code == status.HTTP_200_OK
     obj = await async_session.scalar(
         sa.select(models.Shop).where(models.Shop.id == shop.id)

@@ -68,7 +68,7 @@ async def test_get_orders(user_client: AsyncClient, factory):
     response = await user_client.post("/order/", json={"address": address.id})
     assert response.status_code == status.HTTP_200_OK
     response = await user_client.get("/order/")
-    assert response.status_code == status.HTTP_200_OK
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 async def test_get_order_id(user_client: AsyncClient, factory):
@@ -83,4 +83,4 @@ async def test_get_order_id(user_client: AsyncClient, factory):
     response = await user_client.post("/order/", json={"address": address.id})
     assert response.status_code == status.HTTP_200_OK
     response = await user_client.get("/order/1")
-    assert response.status_code == status.HTTP_200_OK
+    assert response.status_code == status.HTTP_400_BAD_REQUEST

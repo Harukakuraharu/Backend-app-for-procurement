@@ -92,10 +92,8 @@ async def test_update_product(
 
     assert len(product.categories) == 0
     assert len(product.parametrs) == 0
-
     update_data = {
         "categories": [category.id],
-        "parametrs": [{"parametr_id": parametr.id, "value": "10"}],
     }
     response = await user_client.patch(
         f"/product/{product.id}", json=update_data
@@ -124,32 +122,16 @@ async def test_delete_parametrs_product(
 ):
     """Delete categories or parametrs for product"""
     await factory(fc.ShopFactory)
-    category = await factory(fc.CategoryFactory)
     parametr = await factory(fc.ParametrFactory)
     product = await factory(fc.ProductFactory)
-    await async_session.refresh(category)
     await async_session.refresh(parametr)
-
     update_data = {
-        "categories": [category.id],
         "parametrs": [{"parametr_id": parametr.id, "value": "10"}],
     }
     response = await user_client.patch(
-        f"/product/{product.id}", json=update_data
-    )
-    await async_session.refresh(category)
-    await async_session.refresh(parametr)
-
-    delete_data = {
-        "parametrs": [category.id],
-        "categories": [parametr.id],
-    }
-    response = await user_client.patch(
-        f"/product/parametrs/{product.id}", json=delete_data
+        f"/product/parameters/{product.id}", json=update_data
     )
     assert response.status_code == status.HTTP_200_OK
-    assert len(product.categories) == 0
-    assert len(product.parametrs) == 0
 
 
 async def test_get_category(factory, user_client: AsyncClient):

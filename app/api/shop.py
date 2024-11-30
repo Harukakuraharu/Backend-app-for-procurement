@@ -33,7 +33,7 @@ async def create_shop(
 
 @shop_routers.get("/", response_model=list[schemas.ShopsResponse])
 async def get_shops(session: AsyncSessionDependency):
-    """Get active shop"""
+    """Просмотр списка активных магазинов"""
     stmt = sa.select(models.Shop).where(
         models.Shop.active == True  # pylint: disable=C0121
     )
@@ -43,13 +43,26 @@ async def get_shops(session: AsyncSessionDependency):
 
 @shop_routers.get("/{shop_id}", response_model=schemas.ShopResponse)
 async def get_shop_by_id(session: AsyncSessionDependency, shop_id: int):
-    """Получение определенного магазина по id"""
+    """Просмотр определенного магазина по id"""
     shop = await crud.get_item_id(session, models.Shop, shop_id)
     return shop
 
 
-# если нет своего магазина, нечего обновлять
-@shop_routers.patch("/update/", response_model=schemas.ShopsResponse)
+@shop_routers.get("/me/", response_model=schemas.ShopResponse)
+async def get_shop_my(
+    user: GetCurrentUserDependency,
+):
+    """Просмотр своего магаизна"""
+    shop = user.shop
+    if not shop:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You do not have a shop",
+        )
+    return shop
+
+
+@shop_routers.patch("/me/", response_model=schemas.ShopsResponse)
 async def update_shop(
     session: AsyncSessionDependency,
     user: GetCurrentUserDependency,
@@ -68,7 +81,7 @@ async def update_shop(
     return shop
 
 
-@shop_routers.delete("/delete/")
+@shop_routers.delete("/me/")
 async def delete_shop(
     session: AsyncSessionDependency,
     user: GetCurrentUserDependency,
@@ -81,4 +94,4 @@ async def delete_shop(
     await crud.delete_item(
         session, models.Shop, user.shop.id  # type:ignore[attr-defined]
     )
-    return {"status": "deleted"}
+    return {"status": "Successfully deleted"}

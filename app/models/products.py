@@ -27,7 +27,7 @@ class Category(Base):
     __tablename__ = "category"
 
     id: Mapped[intpk]
-    title: Mapped[str] = mapped_column(String(30), unique=True)
+    title: Mapped[str] = mapped_column(String(100), unique=True)
     products: Mapped[list["Product"]] = relationship(
         back_populates="categories",
         lazy="selectin",
@@ -39,7 +39,7 @@ class Product(Base):
     __tablename__ = "product"
 
     id: Mapped[intpk]
-    name: Mapped[str] = mapped_column(String(100), unique=True)
+    name: Mapped[str] = mapped_column(String(100))
     price: Mapped[Decimal]
     remainder: Mapped[int]
     shop_id: Mapped[int] = mapped_column(
@@ -73,7 +73,7 @@ class Parametr(Base):
     __tablename__ = "parametr"
 
     id: Mapped[intpk]
-    name: Mapped[str] = mapped_column(String(50), unique=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
 
 
 class ParametrProduct(Base):

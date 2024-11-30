@@ -120,7 +120,7 @@ class ProductFactory(MainFactory):
         self.data.extend(
             {
                 "name": kwargs.get("name", faker.company()),
-                "price": kwargs.get("price", faker.numerify()),
+                "price": kwargs.get("price", 500),
                 "remainder": kwargs.get("remainder", 10),
                 "shop_id": kwargs.get("shop_id", 1),
             }

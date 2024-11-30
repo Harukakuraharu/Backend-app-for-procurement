@@ -74,6 +74,7 @@ class PasswordReset(BaseModel):
 
 
 class PasswordUpdate(BaseModel):
+    old_password: str
     password: Password
 
 
@@ -112,7 +113,7 @@ class ShopResponse(Shop):
     created_at: datetime.datetime
     model_config = ConfigDict(from_attributes=True)
     user: UserShopResponse
-    products: list["Product"]
+    products: list["ProductShopResponse"]
 
 
 class ShopUpdate(BaseModel):
@@ -142,6 +143,12 @@ class Product(BaseModel):
     name: str
     price: float = Field(gt=0)
     remainder: int
+
+
+class ProductShopResponse(Product):
+    id: int
+    categories: list[int] | None
+    parametrs: list["ParametrProductCreate"] | None
 
 
 class CategoryProduct(Category):
@@ -175,7 +182,6 @@ class ProductUpdate(BaseModel):
     name: str | None = None
     price: float | None = None
     remainder: int | None = None
-    parametrs: list["ParametrProductUpdateResponse"] | None = None
     categories: list[int] | None = None
 
 
@@ -184,13 +190,16 @@ class ParametrProductUpdateResponse(BaseModel):
     value: str | None = None
 
 
+class ParametrProductUpdate(BaseModel):
+    parametrs: list["ParametrProductUpdateResponse"] | None = None
+
+
 class ProductParametrsDelete(BaseModel):
     parametrs: list[int] | None = None
-    categories: list[int] | None = None
 
 
-class ParametrProductDeleteResponse(BaseModel):
-    parametr_id: int | None = None
+# class ParametrProductDeleteResponse(BaseModel):
+#     parametr_id: int | None = None
 
 
 # parametr

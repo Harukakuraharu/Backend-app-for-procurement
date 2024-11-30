@@ -5,7 +5,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.routing import APIRouter
 
 import models
-from api import crud
+from api import crud, utils
 from core import dependency
 from core.celery_app import send_email
 from core.redis_cli import redis_client
@@ -26,21 +26,16 @@ async def create_orderlist(
     data: schemas.OrderProduct,
     user: dependency.GetCurrentUserDependency,
 ):
-    """Create orderlist"""
+    """Создание корзины"""
     order_product = data.model_dump()
-    stmt_product = sa.select(models.Product).where(
-        models.Product.id == order_product["product_id"]
+    product = await utils.check_exists(
+        session, models.Product, models.Product.id, order_product["product_id"]
     )
-    product = await session.scalar(stmt_product)
-    if product is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Product is not exists",
-        )
-    if product.remainder < 0 or product.remainder < order_product["quantity"]:
+    await utils.check_shop_status(product.shop.active)
+    if product.remainder < order_product["quantity"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Неверное количество товара",
+            detail="Product quantity exceeded",
         )
     if redis_client.get(user.id):
         order_list = json.loads(redis_client.get(user.id))
@@ -74,7 +69,7 @@ async def get_orderlist(user: dependency.GetCurrentUserDependency):
     if not redis_client.get(user.id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Корзина пустая",
+            detail="Shopping cart is empty",
         )
     orderlist = json.loads(redis_client.get(user.id))
     return orderlist
@@ -82,7 +77,7 @@ async def get_orderlist(user: dependency.GetCurrentUserDependency):
 
 @orderlist_routers.delete("/")
 async def clear_orderlist(user: dependency.GetCurrentUserDependency):
-    """Просмотр корзины"""
+    """Очистка корзины"""
     redis_client.delete(user.id)
     return {"status": "orderlist is clear"}
 
@@ -97,7 +92,7 @@ async def create_order(
     if not redis_client.get(user.id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Корзина пустая",
+            detail="Shopping cart is empty",
         )
     stmt_emails = sa.select(models.User.email).where(
         models.User.status == models.UserStatus.MANAGER
@@ -107,8 +102,15 @@ async def create_order(
     if len(email) == 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Ошибка заказа. Нет менеджера",
+            detail="Error. Shop do not have a manager",
         )
+    address = await utils.check_current_item(
+        session,
+        models.UserAddress,
+        models.UserAddress.id,
+        data.address,
+        user.id,
+    )
     products = json.loads(redis_client.get(user.id))
     order = await crud.create_item(
         session,
@@ -121,20 +123,6 @@ async def create_order(
         await crud.create_item(session, product, models.OrderList)
     await session.commit()
     await session.refresh(order)
-    redis_client.delete(user.id)
-
-    stmt_address = sa.select(models.UserAddress).where(
-        models.UserAddress.id == data.address
-    )
-    # pylint: disable=C0301
-    address: models.UserAddress = await session.scalar(  # type: ignore[assignment]
-        stmt_address
-    )
-    if address.user_id != user.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Нужно выбрать свой адрес",
-        )
     order_list = [str(orderlist.product) for orderlist in order.orderlist]
     msg = (
         f"Создан новый заказ номер {order.id}\n"
@@ -149,15 +137,29 @@ async def create_order(
         "subject": "Новый заказ",
     }
     send_email.delay(celery_data)
+    redis_client.delete(user.id)
     return order
 
 
-@order_routers.get("/my/", response_model=list[schemas.OrderResponse])
+@order_routers.get("/{order_id}", response_model=schemas.OrderResponse)
+async def get_orders_by_id(
+    session: dependency.AsyncSessionDependency,
+    order_id: int,
+    user: dependency.GetCurrentUserDependency,
+):
+    """Просмотр определенного заказа"""
+    await utils.check_user_status(user.status)  # type: ignore[arg-type]
+    order = await crud.get_item_id(session, models.Order, order_id)
+    return order
+
+
+@order_routers.get("/me/", response_model=list[schemas.OrderResponse])
 async def get_orders_youself(
     session: dependency.AsyncSessionDependency,
     user: dependency.GetCurrentUserDependency,
 ):
-    stmt = sa.select(models.Order).where(models.User.id == user.id)
+    """Просмотр своих заказов"""
+    stmt = sa.select(models.Order).where(models.Order.id == user.id)
     orders = await session.scalars(stmt)
     return orders.unique().all()
 
@@ -168,19 +170,14 @@ async def get_orders(
     user: dependency.GetCurrentUserDependency,
     order_status: models.OrderStatus | None = None,
 ):
-    if user.status == models.UserStatus.BUYER:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Просмотр всех заказов доступен только "
-            "для менеджеров и магазинов",
-        )
+    """Просмотр всех заказов для менеджеров и магазинов"""
+    await utils.check_user_status(user.status)  # type: ignore[arg-type]
     if order_status is not None:
         stmt = sa.select(models.Order).where(
             models.Order.status == order_status
         )
         orders = await session.scalars(stmt)
         return orders.unique().all()
-
     orders = await crud.get_item(session, models.Order)
     return orders
 
@@ -188,13 +185,15 @@ async def get_orders(
 @order_routers.patch(
     "/status/{order_id}",
     response_model=schemas.OrderResponse,
-    dependencies=[Depends(dependency.get_current_user)],
 )
 async def update_orders_status(
     session: dependency.AsyncSessionDependency,
     order_id: int,
     update_data: schemas.OrderUpdate,
+    user: dependency.GetCurrentUserDependency,
 ):
+    """Обновление статуса заказа"""
+    await utils.check_user_status(user.status)  # type: ignore[arg-type]
     data = update_data.model_dump()
     data["id"] = order_id
     order = await crud.update_item(session, models.Order, data)
@@ -220,7 +219,7 @@ async def update_orders_status(
             if product.remainder < 0:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Нет нужного количества товара",
+                    detail="Product quantity exceeded",
                 )
     await session.commit()
     await session.refresh(order)
@@ -228,45 +227,33 @@ async def update_orders_status(
 
 
 @order_routers.delete("/{order_id}")
-async def delete_order(
+async def cancel_order(
     session: dependency.AsyncSessionDependency,
     user: dependency.GetCurrentUserDependency,
     order_id: int,
 ):
-    order = await crud.get_item_id(session, models.Order, order_id)
-    if order.user_id != user.id:
+    """Отмена заказа"""
+    order = await utils.check_current_item(
+        session, models.Order, models.Order.id, order_id, user.id
+    )
+    if order.status in (models.OrderStatus.SENT, models.OrderStatus.DELIVERED):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Order is not yours",
+            detail="You can not cancel order",
         )
-    if order is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Order is not exists",
-        )
-    stmt_email = sa.select(models.User).where(
-        models.User.status == models.UserStatus.MANAGER
+    user_manager = await utils.check_exists(
+        session,
+        models.User,
+        models.User.status,
+        models.UserStatus.MANAGER,  # type: ignore[arg-type]
     )
-    user_manager = await session.scalars(stmt_email)
     emails = [user.email for user in user_manager.unique().all()]
+    order.status = models.OrderStatus.CANCELED
     celery_data = {
         "emails": emails,
-        "msg": f"Заказ номер {order.id} отменен",
+        "msg": f"Заказ номер {order.id} отменен пользователем",
         "subject": "Отмена заказа",
     }
     send_email.delay(celery_data)
-    await crud.delete_item(session, models.Product, order.id)
+    await session.commit()
     return {"status": "Successfully deleted"}
-
-
-@order_routers.get(
-    "/{order_id}",
-    response_model=schemas.OrderResponse,
-    dependencies=[Depends(dependency.get_current_user)],
-)
-async def get_orders_by_id(
-    session: dependency.AsyncSessionDependency,
-    order_id: int,
-):
-    order = await crud.get_item_id(session, models.Order, order_id)
-    return order

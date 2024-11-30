@@ -18,9 +18,9 @@ class User(Base):
     __tablename__ = "user"
 
     id: Mapped[intpk]
-    email: Mapped[str] = mapped_column(String(40), unique=True)
+    email: Mapped[str] = mapped_column(String(100), unique=True)
     password: Mapped[str] = mapped_column(String(72))
-    name: Mapped[str | None] = mapped_column(String(15))
+    name: Mapped[str | None] = mapped_column(String(100))
     status: Mapped[UserStatus]
     phone: Mapped[str | None]
     addresses: Mapped[list["UserAddress"]] = relationship(
@@ -36,7 +36,7 @@ class Shop(Base):
     __tablename__ = "shop"
 
     id: Mapped[intpk]
-    title: Mapped[str] = mapped_column(String(30))
+    title: Mapped[str] = mapped_column(String(100))
     url: Mapped[str | None]
     active: Mapped[bool] = mapped_column(server_default=true())
     user_id: Mapped[int] = mapped_column(
