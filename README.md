@@ -108,7 +108,7 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-## Запуск тестов
+### Запуск тестов
 
 ```
 pytest
