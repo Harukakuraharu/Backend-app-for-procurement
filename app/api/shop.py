@@ -3,7 +3,7 @@ from fastapi import HTTPException, status
 from fastapi.routing import APIRouter
 
 import models
-from api import crud
+from api import crud, utils
 from core.dependency import AsyncSessionDependency, GetCurrentUserDependency
 from schemas import schemas
 
@@ -20,7 +20,7 @@ async def create_shop(
     """Создание магазина"""
     if user.status != models.UserStatus.SHOP:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Create shop can only Shop",
         )
     shop_data = data.model_dump()
@@ -43,8 +43,10 @@ async def get_shops(session: AsyncSessionDependency):
 
 @shop_routers.get("/{shop_id}", response_model=schemas.ShopResponse)
 async def get_shop_by_id(session: AsyncSessionDependency, shop_id: int):
-    """Просмотр определенного магазина по id"""
-    shop = await crud.get_item_id(session, models.Shop, shop_id)
+    """Просмотр определенного магазина по id со списком продуктов"""
+    shop = await utils.check_exists(
+        session, models.Shop, models.Shop.id, shop_id
+    )
     return shop
 
 
@@ -56,7 +58,7 @@ async def get_shop_my(
     shop = user.shop
     if not shop:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="You do not have a shop",
         )
     return shop

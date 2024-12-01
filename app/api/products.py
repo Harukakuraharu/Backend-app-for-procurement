@@ -41,10 +41,8 @@ async def create_products(
 ):
     """Создание товара. Категории и параметры могут быть пустым списком"""
     product_data = data.model_dump()
-    shop = await utils.check_current_item(
-        session, models.Shop, models.Shop.id, product_data["shop_id"], user.id
-    )
-    await utils.check_shop_status(shop.active)
+    product_data["shop_id"] = user.shop.id  # type: ignore[union-attr]
+    await utils.check_shop_status(user.shop.active)  # type: ignore[union-attr]
     await session.flush()
     categories = product_data.pop("categories")
     parametrs = product_data.pop("parametrs")
@@ -188,15 +186,14 @@ async def delete_parametrs_product(
     return product
 
 
-@category_routers.post(
-    "/",
-    response_model=schemas.CategoryCreateResponse,
-    dependencies=[Depends(dependency.get_current_user)],
-)
+@category_routers.post("/", response_model=schemas.CategoryCreateResponse)
 async def create_category(
-    session: dependency.AsyncSessionDependency, data: schemas.Category
+    session: dependency.AsyncSessionDependency,
+    data: schemas.Category,
+    user: dependency.GetCurrentUserDependency,
 ):
     """Создание категории"""
+    await utils.check_user_shop_status(user.status)  # type: ignore
     category_data = data.model_dump()
     category = await crud.create_item(session, category_data, models.Category)
     await session.commit()
@@ -213,9 +210,12 @@ async def get_categories(session: dependency.AsyncSessionDependency):
 
 @parametr_routers.post("/", response_model=schemas.ParametrResponse)
 async def create_parametr(
-    session: dependency.AsyncSessionDependency, data: schemas.Parametr
+    session: dependency.AsyncSessionDependency,
+    data: schemas.Parametr,
+    user: dependency.GetCurrentUserDependency,
 ):
     """Создание параметров"""
+    await utils.check_user_shop_status(user.status)  # type: ignore
     parametr_data = data.model_dump()
     parametr = await crud.create_item(session, parametr_data, models.Parametr)
     await session.commit()
@@ -223,7 +223,11 @@ async def create_parametr(
     return parametr
 
 
-@parametr_routers.get("/", response_model=list[schemas.ParametrResponse])
+@parametr_routers.get(
+    "/",
+    response_model=list[schemas.ParametrResponse],
+    dependencies=[Depends(dependency.get_current_user)],
+)
 async def get_parametrs(session: dependency.AsyncSessionDependency):
     """Просмотр всех параметров"""
     parametr = await crud.get_item(session, models.Parametr)

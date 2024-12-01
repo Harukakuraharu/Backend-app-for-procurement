@@ -53,7 +53,11 @@ async def login(session: AsyncSessionDependency, data: schemas.UserLogin):
     return schemas.Token(access_token=access_token)
 
 
-@user_routers.get("/{user_id}", response_model=schemas.UserResponse)
+@user_routers.get(
+    "/{user_id}",
+    response_model=schemas.UserResponse,
+    dependencies=[Depends(get_current_user)],
+)
 async def get_user_by_id(session: AsyncSessionDependency, user_id: int):
     """Запрос информации о пользователе через id"""
     user = await crud.get_item_id(session, models.User, user_id)

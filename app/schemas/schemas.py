@@ -127,6 +127,11 @@ class Category(BaseModel):
     title: str
 
 
+class CategoryShopResponse(Category):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
 class CategoryResponse(Category):
     id: int
     products: list["ProductsResponse"]
@@ -147,7 +152,7 @@ class Product(BaseModel):
 
 class ProductShopResponse(Product):
     id: int
-    categories: list[int] | None
+    categories: list[CategoryShopResponse] | None
     parametrs: list["ParametrProductCreate"] | None
 
 
@@ -167,7 +172,6 @@ class ParametrProductCreateResponse(ParametrProductCreate):
 class ProductCreate(Product):
     categories: list[int] | None
     parametrs: list[ParametrProductCreate] | None
-    shop_id: int
 
 
 class ProductsResponse(Product):

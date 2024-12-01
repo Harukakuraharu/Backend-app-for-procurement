@@ -86,10 +86,20 @@ async def check_shop_status(shop_status: bool):
 
 
 async def check_user_status(user_status: bool):
-    """To check status of shop"""
+    """To check status of user"""
     if user_status != models.UserStatus.MANAGER:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Order can get or update only manager",
+        )
+    return user_status
+
+
+async def check_user_shop_status(user_status: bool):
+    """To check status of user shop"""
+    if user_status != models.UserStatus.SHOP:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Can only shop",
         )
     return user_status

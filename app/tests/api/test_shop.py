@@ -13,9 +13,37 @@ pytestmark = pytest.mark.anyio
 
 async def test_create_shop(user_client: AsyncClient):
     """Create shop with auth user"""
-    data = {"title": "Hehe", "url": "www.test.fastapi", "user_id": 1}
+    data = {"title": "Hehe", "url": "www.test.fastapi"}
     response = await user_client.post("/shop/", json=data)
     assert response.status_code == status.HTTP_200_OK
+    if response.json().pop("active"):
+        assert response.json()["active"] is True
+    if response.json().pop("id"):
+        assert response.json()["id"] == 1
+    response.json().pop("created_at")
+    assert all(
+        response.json()[key] == data[key]
+        for key in data  # pylint: disable=C0206
+    )
+
+
+@pytest.mark.parametrize(
+    "user_status, status_code",
+    [
+        (models.UserStatus.BUYER.value, status.HTTP_400_BAD_REQUEST),
+        (models.UserStatus.MANAGER.value, status.HTTP_400_BAD_REQUEST),
+        (models.UserStatus.SHOP.value, status.HTTP_200_OK),
+    ],
+)
+async def test_create_shop_not_shop(
+    user_client: AsyncClient, user_status, status_code
+):
+    """Create shop when user status is not shop"""
+    response = await user_client.patch(
+        "/user/me/", json={"status": user_status}
+    )
+    response = await user_client.post("/shop/", json={"title": "Shop"})
+    assert response.status_code == status_code
 
 
 async def test_create_shop_not_auth(client: AsyncClient):
@@ -25,17 +53,22 @@ async def test_create_shop_not_auth(client: AsyncClient):
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
+@pytest.mark.parametrize("shop_active, count", [(False, 0), (True, 3)])
 async def test_get_all_shop(
-    factory, client: AsyncClient, async_session: AsyncSession
+    factory,
+    client: AsyncClient,
+    async_session: AsyncSession,
+    shop_active: bool,
+    count: int,
 ):
-    """Get list al shop"""
+    """Get list all active shop"""
     users = await factory(UserFactory, 3)
     for user in users:
         await async_session.refresh(user)
-        await factory(ShopFactory, user_id=user.id)
+        await factory(ShopFactory, user_id=user.id, active=shop_active)
     response = await client.get("/shop/")
     assert response.status_code == status.HTTP_200_OK
-    assert len(response.json()) == 3
+    assert len(response.json()) == count
 
 
 async def test_get_shop_by_id(
@@ -43,7 +76,7 @@ async def test_get_shop_by_id(
     factory,
     client: AsyncClient,
 ):
-    """Get shop by id"""
+    """Get shop by id with not auth user"""
     await factory(ShopFactory)
     response = await client.get("/shop/1")
     assert response.status_code == status.HTTP_200_OK
@@ -54,9 +87,22 @@ async def test_get_not_exists_shop(
     factory,
     user_client: AsyncClient,  # pylint: disable=W0613
 ):
-    """Get not exists shop"""
+    """Get not exists shop with not auth user"""
     await factory(ShopFactory)
     response = await client.get("/shop/5")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+async def test_get_youself_shop(user_client: AsyncClient, factory):
+    """Get for youself shop"""
+    await factory(ShopFactory)
+    response = await user_client.get("/shop/me/")
+    assert response.status_code == status.HTTP_200_OK
+
+
+async def test_get_youself_not_exists_shop(user_client: AsyncClient):
+    """Get for youself shop if user has not shop"""
+    response = await user_client.get("/shop/me/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 

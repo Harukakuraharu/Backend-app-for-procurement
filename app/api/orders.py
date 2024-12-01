@@ -141,6 +141,24 @@ async def create_order(
     return order
 
 
+@order_routers.get("/", response_model=list[schemas.OrderResponse])
+async def get_orders(
+    session: dependency.AsyncSessionDependency,
+    user: dependency.GetCurrentUserDependency,
+    order_status: models.OrderStatus | None = None,
+):
+    """Просмотр всех заказов для менеджеров и магазинов"""
+    await utils.check_user_status(user.status)  # type: ignore[arg-type]
+    if order_status is not None:
+        stmt = sa.select(models.Order).where(
+            models.Order.status == order_status
+        )
+        orders = await session.scalars(stmt)
+        return orders.unique().all()
+    orders = await crud.get_item(session, models.Order)
+    return orders
+
+
 @order_routers.get("/{order_id}", response_model=schemas.OrderResponse)
 async def get_orders_by_id(
     session: dependency.AsyncSessionDependency,
@@ -164,24 +182,6 @@ async def get_orders_youself(
     return orders.unique().all()
 
 
-@order_routers.get("/", response_model=list[schemas.OrderResponse])
-async def get_orders(
-    session: dependency.AsyncSessionDependency,
-    user: dependency.GetCurrentUserDependency,
-    order_status: models.OrderStatus | None = None,
-):
-    """Просмотр всех заказов для менеджеров и магазинов"""
-    await utils.check_user_status(user.status)  # type: ignore[arg-type]
-    if order_status is not None:
-        stmt = sa.select(models.Order).where(
-            models.Order.status == order_status
-        )
-        orders = await session.scalars(stmt)
-        return orders.unique().all()
-    orders = await crud.get_item(session, models.Order)
-    return orders
-
-
 @order_routers.patch(
     "/status/{order_id}",
     response_model=schemas.OrderResponse,
@@ -192,7 +192,7 @@ async def update_orders_status(
     update_data: schemas.OrderUpdate,
     user: dependency.GetCurrentUserDependency,
 ):
-    """Обновление статуса заказа"""
+    """Обновление статуса заказа для менеджеров"""
     await utils.check_user_status(user.status)  # type: ignore[arg-type]
     data = update_data.model_dump()
     data["id"] = order_id
@@ -256,4 +256,4 @@ async def cancel_order(
     }
     send_email.delay(celery_data)
     await session.commit()
-    return {"status": "Successfully deleted"}
+    return {"status": "Successfully canceled"}

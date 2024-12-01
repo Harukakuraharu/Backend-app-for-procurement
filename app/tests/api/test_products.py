@@ -30,17 +30,22 @@ async def test_get_all_products(
 
 async def test_create_product(factory, user_client: AsyncClient):
     """Create product without categories and parametrs"""
-    shop = await factory(fc.ShopFactory)
+    await factory(fc.ShopFactory)
     data = {
         "name": "Moana",
         "price": 100,
         "remainder": 5,
-        "shop_id": shop.id,
         "categories": [],
         "parametrs": [],
     }
     response = await user_client.post("/product/", json=data)
     assert response.status_code == status.HTTP_200_OK
+    response.json().pop("id")
+    response.json().pop("shop")
+    assert all(
+        response.json()[key] == data[key]
+        for key in data  # pylint: disable=C0206
+    )
 
 
 async def test_create_full_products(
@@ -59,48 +64,69 @@ async def test_create_full_products(
         "remainder": 15,
         "categories": [categories.id],
         "parametrs": [{"parametr_id": parametrs.id, "value": "1000"}],
-        "shop_id": shop.id,
     }
     response = await user_client.post("/product/", json=data)
     assert response.status_code == status.HTTP_200_OK
 
 
-async def test_main_update_product(factory, user_client: AsyncClient):
-    """Update product without categories and products"""
-    shop = await factory(fc.ShopFactory)
-    product = await factory(fc.ProductFactory, shop_id=shop.id)
-    update_data = {
-        "price": 1,
-    }
+async def test_update_product(factory, user_client: AsyncClient):
+    """Update product"""
+    await factory(fc.ShopFactory)
+    product = await factory(fc.ProductFactory)
+    update_data = {"price": 1, "categories": []}
     response = await user_client.patch(
         f"/product/{product.id}", json=update_data
     )
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["price"] == update_data["price"]
+    assert response.json()["categories"] == update_data["categories"]
 
 
-async def test_update_product(
+async def test_update_product_parametrs(
     factory, user_client: AsyncClient, async_session: AsyncSession
 ):
-    """Update product with categories and products"""
+    """Update or create product parametrs"""
     await factory(fc.ShopFactory)
-    category = await factory(fc.CategoryFactory)
     parametr = await factory(fc.ParametrFactory)
     product = await factory(fc.ProductFactory)
-    await async_session.refresh(category)
     await async_session.refresh(parametr)
-
-    assert len(product.categories) == 0
     assert len(product.parametrs) == 0
     update_data = {
-        "categories": [category.id],
+        "parametrs": [{"parametr_id": parametr.id, "value": "string"}]
     }
     response = await user_client.patch(
-        f"/product/{product.id}", json=update_data
+        f"/product/parameters/{product.id}", json=update_data
     )
     assert response.status_code == status.HTTP_200_OK
-    assert product.categories is not None
-    assert product.parametrs is not None
+    assert (
+        response.json()["parametrs"][0]["parametr_id"]
+        == update_data["parametrs"][0]["parametr_id"]
+    )
+    assert (
+        response.json()["parametrs"][0]["value"]
+        == update_data["parametrs"][0]["value"]
+    )
+
+
+# async def test_delete_parametrs_product(
+#     factory, user_client: AsyncClient, async_session: AsyncSession
+# ):
+#     """Delete categories or parametrs for product"""
+#     await factory(fc.ShopFactory)
+#     parametr = await factory(fc.ParametrFactory)
+#     product = await factory(fc.ProductFactory)
+#     await async_session.refresh(parametr)
+#     update_data = {
+#         "parametrs": [{"parametr_id": parametr.id, "value": "10"}],
+#     }
+#     response = await user_client.patch(
+#         f"/product/parameters/{product.id}", json=update_data
+#     )
+#     assert response.status_code == status.HTTP_200_OK
+#     response = user_client.delete(
+#         f"/product/parameters/{product.id}", json={"parametrs": [1]}
+#     )
+#     assert response.status_code == status.HTTP_200_OK
 
 
 async def test_delete_products(
@@ -115,23 +141,6 @@ async def test_delete_products(
         sa.select(models.Product).where(models.Product.id == product.id)
     )
     assert obj is None
-
-
-async def test_delete_parametrs_product(
-    factory, user_client: AsyncClient, async_session: AsyncSession
-):
-    """Delete categories or parametrs for product"""
-    await factory(fc.ShopFactory)
-    parametr = await factory(fc.ParametrFactory)
-    product = await factory(fc.ProductFactory)
-    await async_session.refresh(parametr)
-    update_data = {
-        "parametrs": [{"parametr_id": parametr.id, "value": "10"}],
-    }
-    response = await user_client.patch(
-        f"/product/parameters/{product.id}", json=update_data
-    )
-    assert response.status_code == status.HTTP_200_OK
 
 
 async def test_get_category(factory, user_client: AsyncClient):

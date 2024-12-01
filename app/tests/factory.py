@@ -100,6 +100,7 @@ class ShopFactory(MainFactory):
                 "title": kwargs.get("title", faker.company()),
                 "url": kwargs.get("url", faker.url()),
                 "user_id": kwargs.get("user_id", 1),
+                "active": kwargs.get("active", True),
             }
             for _ in range(count)
         )
