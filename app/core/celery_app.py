@@ -5,6 +5,7 @@ from email.message import EmailMessage
 import sqlalchemy as sa
 import yaml
 from celery import Celery
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 import models
@@ -36,61 +37,67 @@ def send_email(data: dict):
 
 
 @celery_app.task
-def products_import(contents: bytes, user_id: int):
+def products_import(contents: bytes, user_id: int):  # pylint: disable=R0914
     with Session(bind=engine) as session:
-        data = yaml.safe_load(contents)
-        user = crud.sync_get_item_id(session, models.User, user_id)
-        if not user.shop:
-            shop = crud.sync_create_item(
-                session,
-                {"title": data["shop"], "user_id": user.id},
-                models.Shop,
-            )
-            shop.active = True
-            session.flush()
-            user.shop = shop
-        shop_id = user.shop.id  # type: ignore[union-attr]
-        for product in data["goods"]:
-            parameters = product.pop("parameters")
-            categories = product.pop("category")
-            product["shop_id"] = shop_id
-            product_db = crud.sync_create_item(
-                session, product, models.Product
-            )
-            session.flush()
-            for parametr, value in parameters.items():
-                parametr_db = session.scalar(
-                    sa.select(models.Parametr).where(
-                        models.Parametr.name == parametr
-                    )
-                )
-                if not parametr_db:
-                    parametr_db = crud.sync_create_item(
-                        session, {"name": parametr}, models.Parametr
-                    )
-                    session.flush()
-                crud.sync_create_item(
+        try:
+            data = yaml.safe_load(contents)
+            user = crud.sync_get_item_id(session, models.User, user_id)
+            if not user.shop:
+                shop = crud.sync_create_item(
                     session,
-                    {
-                        "product_id": product_db.id,
-                        # pylint: disable=C0301
-                        "parametr_id": parametr_db.id,  # type: ignore[union-attr]
-                        "value": value,
-                    },
-                    models.ParametrProduct,
+                    {"title": data["shop"], "user_id": user.id},
+                    models.Shop,
                 )
-            session.commit()
-            session.refresh(product_db)
-
-            category_db = session.scalar(
-                sa.select(models.Category).where(
-                    models.Category.title == categories
-                )
-            )
-            if not category_db:
-                category_db = crud.sync_create_item(
-                    session, {"title": categories}, models.Category
+                shop.active = True
+                session.flush()
+                user.shop = shop
+            shop_id = user.shop.id  # type: ignore[union-attr]
+            for product in data["goods"]:
+                parameters = product.pop("parameters")
+                categories = product.pop("category")
+                product["shop_id"] = shop_id
+                product_db = crud.sync_create_item(
+                    session, product, models.Product
                 )
                 session.flush()
-            product_db.categories = [category_db]
-        session.commit()
+                for parametr, value in parameters.items():
+                    parametr_db = session.scalar(
+                        sa.select(models.Parametr).where(
+                            models.Parametr.name == parametr
+                        )
+                    )
+                    if not parametr_db:
+                        parametr_db = crud.sync_create_item(
+                            session, {"name": parametr}, models.Parametr
+                        )
+                        session.flush()
+                    crud.sync_create_item(
+                        session,
+                        {
+                            "product_id": product_db.id,
+                            # pylint: disable=C0301
+                            "parametr_id": parametr_db.id,  # type: ignore[union-attr]
+                            "value": value,
+                        },
+                        models.ParametrProduct,
+                    )
+                session.commit()
+                session.refresh(product_db)
+
+                category_db = session.scalar(
+                    sa.select(models.Category).where(
+                        models.Category.title == categories
+                    )
+                )
+                if not category_db:
+                    category_db = crud.sync_create_item(
+                        session, {"title": categories}, models.Category
+                    )
+                    session.flush()
+                product_db.categories = [category_db]
+            session.commit()
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Error. Try again or check your yaml file",
+            ) from exc
