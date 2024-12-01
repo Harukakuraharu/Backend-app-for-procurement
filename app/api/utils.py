@@ -96,7 +96,7 @@ async def check_user_status(user_status: bool):
 
 
 async def check_user_shop_status(user_status: bool):
-    """To check status of user shop"""
+    """To check status of user for shop"""
     if user_status != models.UserStatus.SHOP:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

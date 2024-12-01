@@ -57,7 +57,6 @@ async def create_orderlist(
         else:
             redis_client.set(user.id, json.dumps(order_list))
         return order_list
-
     order_list = [order_product]
     redis_client.set(user.id, json.dumps(order_list))
     return order_list
@@ -83,7 +82,7 @@ async def clear_orderlist(user: dependency.GetCurrentUserDependency):
 
 
 @order_routers.post("/", response_model=schemas.OrderResponse)
-async def create_order(
+async def create_order(  # pylint: disable=R0914
     session: dependency.AsyncSessionDependency,
     user: dependency.GetCurrentUserDependency,
     data: schemas.OrderCreate,
@@ -108,13 +107,17 @@ async def create_order(
         session,
         models.UserAddress,
         models.UserAddress.id,
-        data.address,
+        data.address_id,
         user.id,
     )
     products = json.loads(redis_client.get(user.id))
     order = await crud.create_item(
         session,
-        {"user_id": user.id, "status": models.OrderStatus.INPROGRES},
+        {
+            "user_id": user.id,
+            "status": models.OrderStatus.INPROGRES,
+            "address_id": address.id,
+        },
         models.Order,
     )
     await session.flush()
@@ -126,7 +129,7 @@ async def create_order(
     order_list = [str(orderlist.product) for orderlist in order.orderlist]
     msg = (
         f"Создан новый заказ номер {order.id}\n"
-        f"Детали заказа: {"\n".join(order_list)}\n"
+        f"Детали заказа: \n{"\n".join(order_list)}\n"
         f"id заказчика {order.user_id}.\nАдрес доставки: "
         f"город {address.city}, адрес {address.address}"
     )
@@ -138,6 +141,24 @@ async def create_order(
     }
     send_email.delay(celery_data)
     redis_client.delete(user.id)
+    order_dict = {
+        orderlist.product_id: orderlist.quantity
+        for orderlist in order.orderlist
+    }
+    stmt = sa.select(models.Product).where(
+        models.Product.id.in_(set(product_id for product_id in order_dict))
+    )
+    products = await session.scalars(stmt)
+    for product in products.unique().all():
+        quantity = order_dict[product.id]
+        product.remainder -= quantity
+        if product.remainder < 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Product quantity exceeded",
+            )
+    await session.commit()
+    await session.refresh(order)
     return order
 
 
@@ -147,7 +168,7 @@ async def get_orders(
     user: dependency.GetCurrentUserDependency,
     order_status: models.OrderStatus | None = None,
 ):
-    """Просмотр всех заказов для менеджеров и магазинов"""
+    """Просмотр всех заказов для менеджеров"""
     await utils.check_user_status(user.status)  # type: ignore[arg-type]
     if order_status is not None:
         stmt = sa.select(models.Order).where(
@@ -177,56 +198,12 @@ async def get_orders_youself(
     user: dependency.GetCurrentUserDependency,
 ):
     """Просмотр своих заказов"""
-    stmt = sa.select(models.Order).where(models.Order.id == user.id)
+    stmt = sa.select(models.Order).where(models.Order.user_id == user.id)
     orders = await session.scalars(stmt)
     return orders.unique().all()
 
 
-@order_routers.patch(
-    "/status/{order_id}",
-    response_model=schemas.OrderResponse,
-)
-async def update_orders_status(
-    session: dependency.AsyncSessionDependency,
-    order_id: int,
-    update_data: schemas.OrderUpdate,
-    user: dependency.GetCurrentUserDependency,
-):
-    """Обновление статуса заказа для менеджеров"""
-    await utils.check_user_status(user.status)  # type: ignore[arg-type]
-    data = update_data.model_dump()
-    data["id"] = order_id
-    order = await crud.update_item(session, models.Order, data)
-    msg = f"Заказ номер {order.id}\n" f"Статус заказа: {data["status"]}\n"
-    celery_data = {
-        "emails": order.user.email,
-        "msg": msg,
-        "subject": "Информация по заказу",
-    }
-    send_email.delay(celery_data)
-    if data["status"] == models.OrderStatus.CONFIRMED:
-        order_dict = {
-            orderlist.product_id: orderlist.quantity
-            for orderlist in order.orderlist
-        }
-        stmt = sa.select(models.Product).where(
-            models.Product.id.in_(set(product_id for product_id in order_dict))
-        )
-        products = await session.scalars(stmt)
-        for product in products.unique().all():
-            quantity = order_dict[product.id]
-            product.remainder -= quantity
-            if product.remainder < 0:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Product quantity exceeded",
-                )
-    await session.commit()
-    await session.refresh(order)
-    return order
-
-
-@order_routers.delete("/{order_id}")
+@order_routers.delete("/me/{order_id}")
 async def cancel_order(
     session: dependency.AsyncSessionDependency,
     user: dependency.GetCurrentUserDependency,
@@ -241,13 +218,11 @@ async def cancel_order(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You can not cancel order",
         )
-    user_manager = await utils.check_exists(
-        session,
-        models.User,
-        models.User.status,
-        models.UserStatus.MANAGER,  # type: ignore[arg-type]
+    stmt_emails = sa.select(models.User.email).where(
+        models.User.status == models.UserStatus.MANAGER
     )
-    emails = [user.email for user in user_manager.unique().all()]
+    manager_emails = await session.scalars(stmt_emails)
+    emails = manager_emails.all()
     order.status = models.OrderStatus.CANCELED
     celery_data = {
         "emails": emails,
@@ -257,3 +232,38 @@ async def cancel_order(
     send_email.delay(celery_data)
     await session.commit()
     return {"status": "Successfully canceled"}
+
+
+@order_routers.patch(
+    "/status/{order_id}",
+    response_model=schemas.OrderResponse,
+)
+async def update_orders_status(
+    session: dependency.AsyncSessionDependency,
+    order_id: int,
+    update_data: schemas.OrderUpdate,
+    user: dependency.GetCurrentUserDependency,
+):
+    """Обновление статуса заказа для менеджеров"""
+    await utils.check_user_status(user.status)  # type: ignore[arg-type]
+    order = await utils.check_exists(
+        session, models.Order, models.Order.id, order_id
+    )
+    if order.status == models.OrderStatus.CANCELED:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order is canceled",
+        )
+    data = update_data.model_dump()
+    data["id"] = order_id
+    order = await crud.update_item(session, models.Order, data)
+    msg = f"Заказ номер {order.id}\n" f"Статус заказа: {order.status.value}\n"
+    celery_data = {
+        "emails": order.user.email,
+        "msg": msg,
+        "subject": "Информация по заказу",
+    }
+    send_email.delay(celery_data)
+    await session.commit()
+    await session.refresh(order)
+    return order

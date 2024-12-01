@@ -105,11 +105,13 @@ async def test_create_order(
     await factory(fc.UserFactory, status=user_status)
     await factory(fc.ShopFactory)
     product = await factory(fc.ProductFactory)
-    data = {"quantity": 5, "product_id": product.id}
+    data = {"quantity": 2, "product_id": product.id}
     response = await user_client.post("/orderlist/", json=data)
     assert response.status_code == status.HTTP_200_OK
     address = await factory(fc.UserAddressFactory)
-    response = await user_client.post("/order/", json={"address": address.id})
+    response = await user_client.post(
+        "/order/", json={"address_id": address.id}
+    )
     assert response.status_code == status_code
 
 
@@ -122,7 +124,7 @@ async def test_create_order_address(user_client: AsyncClient, factory):
     response = await user_client.post("/orderlist/", json=data)
     assert response.status_code == status.HTTP_200_OK
     await factory(fc.UserAddressFactory)
-    response = await user_client.post("/order/", json={"address": 5})
+    response = await user_client.post("/order/", json={"address_id": 5})
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -135,7 +137,9 @@ async def test_get_orders(user_client: AsyncClient, factory):
     response = await user_client.post("/orderlist/", json=data)
     assert response.status_code == status.HTTP_200_OK
     address = await factory(fc.UserAddressFactory)
-    response = await user_client.post("/order/", json={"address": address.id})
+    response = await user_client.post(
+        "/order/", json={"address_id": address.id}
+    )
     assert response.status_code == status.HTTP_200_OK
     response = await user_client.get("/order/")
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -150,7 +154,9 @@ async def test_get_order_id(user_client: AsyncClient, factory):
     response = await user_client.post("/orderlist/", json=data)
     assert response.status_code == status.HTTP_200_OK
     address = await factory(fc.UserAddressFactory)
-    response = await user_client.post("/order/", json={"address": address.id})
+    response = await user_client.post(
+        "/order/", json={"address_id": address.id}
+    )
     assert response.status_code == status.HTTP_200_OK
     response = await user_client.get("/order/1")
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -158,7 +164,7 @@ async def test_get_order_id(user_client: AsyncClient, factory):
 
 async def test_get_youself_order(user_client: AsyncClient, factory):
     """Get youself order"""
-    fields = ["id", "created_at", "status", "user_id", "orderlist"]
+    fields = ["id", "created_at", "status", "user_id", "orderlist", "address"]
     await factory(fc.UserFactory, status=models.UserStatus.MANAGER)
     await factory(fc.ShopFactory)
     product = await factory(fc.ProductFactory)
@@ -166,7 +172,9 @@ async def test_get_youself_order(user_client: AsyncClient, factory):
     response = await user_client.post("/orderlist/", json=data)
     assert response.status_code == status.HTTP_200_OK
     address = await factory(fc.UserAddressFactory)
-    response = await user_client.post("/order/", json={"address": address.id})
+    response = await user_client.post(
+        "/order/", json={"address_id": address.id}
+    )
     response = await user_client.get("/order/me/")
     assert response.status_code == status.HTTP_200_OK
     for key in response.json()[0]:

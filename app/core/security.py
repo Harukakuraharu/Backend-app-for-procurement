@@ -21,6 +21,10 @@ def check_password(
 
 async def auth(session: AsyncSessionDependency, email: str, password: str):
     user = await get_user(session, email)
+    if user.active is False:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "User is not verify with email"
+        )
     if not user or not check_password(password, user.password):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED, "Incorrect password or username"

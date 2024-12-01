@@ -18,11 +18,7 @@ async def create_shop(
     user: GetCurrentUserDependency,
 ):
     """Создание магазина"""
-    if user.status != models.UserStatus.SHOP:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Create shop can only Shop",
-        )
+    await utils.check_user_shop_status(user.status)  # type: ignore[arg-type]
     shop_data = data.model_dump()
     shop_data["user_id"] = user.id
     shop = await crud.create_item(session, shop_data, models.Shop)

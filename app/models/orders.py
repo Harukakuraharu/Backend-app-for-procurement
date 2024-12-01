@@ -34,6 +34,12 @@ class Order(Base):
     orderlist: Mapped[list["OrderList"]] = relationship(
         back_populates="order", lazy="selectin"
     )
+    address_id: Mapped[int] = mapped_column(
+        ForeignKey("useraddress.id", ondelete="CASCADE")
+    )
+    address: Mapped["UserAddress"] = relationship(  # type: ignore[name-defined]
+        back_populates="order", lazy="joined"
+    )
 
 
 class OrderList(Base):

@@ -35,6 +35,13 @@ async def create_item(
     return response
 
 
+def sync_create_item(session, data: dict[str, Any], model: TypeModel):
+    stmt = sa.insert(model).returning(model).values(**data)
+    response = session.scalar(stmt)
+    # session.flush()
+    return response
+
+
 async def update_item(
     session: AsyncSessionDependency, model: TypeModel, data: dict[str, Any]
 ):
@@ -67,4 +74,10 @@ async def get_item_id(
         raise HTTPException(
             status.HTTP_404_NOT_FOUND, f"{model.__name__} not found"
         )
+    return response
+
+
+def sync_get_item_id(session, model: TypeModel, item_id: int):
+    stmt = sa.select(model).where(model.id == item_id)
+    response = session.scalar(stmt)
     return response

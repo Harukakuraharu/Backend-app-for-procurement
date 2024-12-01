@@ -1,4 +1,5 @@
 from datetime import timedelta
+from uuid import uuid4
 
 import sqlalchemy as sa
 from fastapi import Depends, HTTPException, status
@@ -11,7 +12,9 @@ from core.dependency import (
     AsyncSessionDependency,
     GetCurrentUserDependency,
     get_current_user,
+    get_user,
 )
+from core.redis_cli import redis_client
 from core.security import (
     auth,
     check_password,
@@ -32,10 +35,22 @@ async def create_user(
 ):
     """Регистрация пользователей"""
     user_data = data.model_dump()
+    verify_path = str(uuid4())
+    redis_client.set(verify_path, user_data["email"])
     user_data["password"] = hash_password(user_data["password"])
     user = await crud.create_item(session, user_data, models.User)
     await session.commit()
     await session.refresh(user)
+    send_email.delay(
+        {
+            "msg": (
+                "Чтобы завершить регистрацию, перейдите по ссылке: "
+                f"{config.BASE_URL}/user/{verify_path}/"
+            ),
+            "subject": "Подтверждение регистрации",
+            "emails": user.email,
+        }
+    )
     return user
 
 
@@ -43,7 +58,6 @@ async def create_user(
 async def login(session: AsyncSessionDependency, data: schemas.UserLogin):
     """Вход пользователя в личный кабинет"""
     user = await auth(session, data.email, data.password)
-
     access_token_expires = timedelta(
         minutes=config.ACCESS_TOKEN_EXPIRE_MINUTES
     )
@@ -55,7 +69,7 @@ async def login(session: AsyncSessionDependency, data: schemas.UserLogin):
 
 @user_routers.get(
     "/{user_id}",
-    response_model=schemas.UserResponse,
+    response_model=schemas.UserIdResponse,
     dependencies=[Depends(get_current_user)],
 )
 async def get_user_by_id(session: AsyncSessionDependency, user_id: int):
@@ -100,7 +114,7 @@ async def update_user(
         if current_user.shop:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="You have a shop.",
+                detail="You have a shop",
             )
     update_data["id"] = current_user.id
     user = await crud.update_item(session, models.User, update_data)
@@ -115,6 +129,7 @@ async def delete_user(
 ):
     """Удаление пользовательского аккаунта"""
     await crud.delete_item(session, models.User, current_user.id)
+    return {"status": "Successfully deleted"}
 
 
 @user_routers.post("/me/address/", response_model=schemas.UserAddressResponse)
@@ -143,7 +158,7 @@ async def get_user_address(
     addresses = await utils.check_owner(
         session, models.UserAddress, current_user.id
     )
-    return addresses
+    return addresses.unique().all()
 
 
 @user_routers.patch(
@@ -227,7 +242,7 @@ async def reser_password(
     user = await crud.update_item(session, models.User, data)
     msg = (
         f"Новый пароль для пользователя {user.email}: "
-        f"{new_password}. Обязательно поменяйте пароль в личном кабинете."
+        f"{new_password} \nОбязательно поменяйте пароль в личном кабинете."
     )
     celery_data = {
         "emails": user.email,
@@ -237,3 +252,22 @@ async def reser_password(
     await session.commit()
     send_email.delay(celery_data)
     return {"status": "Письмо с новым паролем отправлено на почту"}
+
+
+@user_routers.get("/{verify_path}/")
+async def verify_email(
+    verify_path: str,
+    session: AsyncSessionDependency,
+):
+    """Подтверждение почты"""
+    if not redis_client.get(verify_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Error",
+        )
+    email = redis_client.get(verify_path)
+    user = await get_user(session, email.decode())
+    user.active = True
+    await session.commit()
+    redis_client.delete(verify_path)
+    return {"status": "Successfully verify"}

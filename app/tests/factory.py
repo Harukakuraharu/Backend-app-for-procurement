@@ -56,6 +56,7 @@ class UserFactory(MainFactory):
                 "name": kwargs.get("name", faker.first_name()),
                 "phone": kwargs.get("phone", faker.phone_number()),
                 "status": kwargs.get("status", models.UserStatus.SHOP),
+                "active": kwargs.get("active", True),
             }
             for _ in range(count)
         )
@@ -122,7 +123,7 @@ class ProductFactory(MainFactory):
             {
                 "name": kwargs.get("name", faker.company()),
                 "price": kwargs.get("price", 500),
-                "remainder": kwargs.get("remainder", 10),
+                "remainder": kwargs.get("remainder", 20),
                 "shop_id": kwargs.get("shop_id", 1),
             }
             for _ in range(count)

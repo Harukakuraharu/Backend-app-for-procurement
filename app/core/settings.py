@@ -14,8 +14,8 @@ class Config(BaseSettings):
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
 
-    SECRET_KEY: str = "fgdhghgdjhgh"
-    ALGORITHM: str = "HS256"
+    SECRET_KEY: str = Field(default="")
+    ALGORITHM: str = Field(default="")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 100
 
     REDIS_HOST: str = "localhost"
@@ -24,6 +24,8 @@ class Config(BaseSettings):
     CORP_HOST: str = Field(default="")
     CORP_PORT: int = Field(default=0)
     CORP_KEY: str = Field(default="")
+
+    BASE_URL: str = Field(default="")
 
     @computed_field
     def redis_url(self) -> str:

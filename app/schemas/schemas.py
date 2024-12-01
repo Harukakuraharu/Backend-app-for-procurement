@@ -16,6 +16,7 @@ def validate_password(password: str) -> str:
 Password = Annotated[str, AfterValidator(validate_password)]
 
 
+# addresses
 class UserAddress(BaseModel):
     city: str
     address: str
@@ -31,6 +32,7 @@ class UserAddressUpdate(BaseModel):
     address: str | None = None
 
 
+# users
 class User(BaseModel):
     email: EmailStr
     status: models.UserStatus
@@ -52,6 +54,13 @@ class UserCreateResponse(User):
 
 class UserCreate(User):
     password: Password
+
+
+class UserIdResponse(BaseModel):
+    status: models.UserStatus
+    name: str
+    id: int
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserUpdate(BaseModel):
@@ -244,7 +253,7 @@ class ParametrProductCreateParametr(BaseModel):
 
 # orders
 class OrderCreate(BaseModel):
-    address: int
+    address_id: int
 
 
 class OrderResponse(BaseModel):
@@ -252,6 +261,7 @@ class OrderResponse(BaseModel):
     created_at: datetime.datetime
     status: models.OrderStatus = models.OrderStatus.INPROGRES
     user_id: int
+    address: UserAddressResponse
     orderlist: list["OrderList"]
     model_config = ConfigDict(from_attributes=True)
 

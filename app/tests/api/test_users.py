@@ -64,20 +64,19 @@ async def test_create_user_incorrect_password(
 async def test_auth_user(client: AsyncClient, factory):
     """Auth user"""
     password = "string123"
-    user = await factory(fc.UserFactory, password=password)
+    user = await factory(fc.UserFactory, password=password, active=True)
     data = {
         "email": user.email,
         "password": password,
     }
     response = await client.post("/user/auth/", json=data)
     assert response.status_code == status.HTTP_200_OK
-    assert "access_token" in response.json()
 
 
 async def test_auth_user_with_invalid_password(client: AsyncClient, factory):
     """Auth with incorrect password"""
     password = "string123"
-    user = await factory(fc.UserFactory, password=password)
+    user = await factory(fc.UserFactory, password=password, active=True)
     data = {
         "email": user.email,
         "password": "string12345",

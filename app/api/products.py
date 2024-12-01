@@ -1,5 +1,5 @@
 import sqlalchemy as sa
-from fastapi import Depends
+from fastapi import Depends, HTTPException, status
 from fastapi.routing import APIRouter
 
 import models
@@ -40,6 +40,12 @@ async def create_products(
     user: dependency.GetCurrentUserDependency,
 ):
     """Создание товара. Категории и параметры могут быть пустым списком"""
+    await utils.check_user_shop_status(user.status)  # type: ignore[arg-type]
+    if user.shop is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You do not have a shop",
+        )
     product_data = data.model_dump()
     product_data["shop_id"] = user.shop.id  # type: ignore[union-attr]
     await utils.check_shop_status(user.shop.active)  # type: ignore[union-attr]
@@ -123,7 +129,7 @@ async def update_or_create_product_parametrs(
     user: dependency.GetCurrentUserDependency,
 ):
     """
-    Обновление параметров для продукты и/или добавление новых параметров
+    Обновление параметров для продуктов и/или добавление новых параметров
     """
     update_data = data.model_dump(exclude_unset=True)
     product = await crud.get_item_id(session, models.Product, product_id)
@@ -201,7 +207,7 @@ async def create_category(
     return category
 
 
-@category_routers.get("/", response_model=list[schemas.CategoryResponse])
+@category_routers.get("/", response_model=list[schemas.CategoryCreateResponse])
 async def get_categories(session: dependency.AsyncSessionDependency):
     """Просмотр всех категорий"""
     categories = await crud.get_item(session, models.Category)
