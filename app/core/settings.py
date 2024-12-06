@@ -35,6 +35,11 @@ class Config(BaseSettings):
         return f"redis://{self.REDIS_HOST}:6379/1"
 
     @computed_field
+    def redis_cache_url(self) -> str:
+        """Формирование url для redis"""
+        return f"redis://{self.REDIS_HOST}:6379/3"
+
+    @computed_field
     def celery_url(self) -> str:
         """Формирование url для redis"""
         return f"redis://{self.REDIS_HOST}:6379/2"

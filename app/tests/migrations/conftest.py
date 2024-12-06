@@ -37,7 +37,7 @@ def postgres_engine_fixture(
     На вход принимается полностью сформированный тестовый URL
     из предыдущей фикстуры и создается engine
     """
-    engine = create_engine(postgres, echo=True)
+    engine = create_engine(postgres, echo=False)
     try:
         yield engine
     finally:

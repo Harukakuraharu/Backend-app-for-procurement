@@ -246,6 +246,21 @@ jupyter = ["ipython (>=7.8.0)", "tokenize-rt (>=3.2.0)"]
 uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
+name = "cache-fastapi"
+version = "0.0.6"
+description = "Clean caching library for FastAPI"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "cache_fastapi-0.0.6-py3-none-any.whl", hash = "sha256:8a258a310d78e02b1a6f2ab4c6bf6c56eddccf04f976d93e91f6f7435718e9da"},
+    {file = "cache_fastapi-0.0.6.tar.gz", hash = "sha256:8fb295e91556dc218bcbc0bf31d4c0a1b048de758936304a3486b744d2ed2755"},
+]
+
+[package.dependencies]
+python-dotenv = "*"
+redis = "*"
+
+[[package]]
 name = "celery"
 version = "5.4.0"
 description = "Distributed Task Queue."
@@ -1798,6 +1813,23 @@ files = [
 ]
 
 [[package]]
+name = "urllib3"
+version = "2.2.3"
+description = "HTTP library with thread-safe connection pooling, file post, and more."
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "urllib3-2.2.3-py3-none-any.whl", hash = "sha256:ca899ca043dcb1bafa3e262d73aa25c465bfb49e0bd9dd5d59f1d0acba2f8fac"},
+    {file = "urllib3-2.2.3.tar.gz", hash = "sha256:e7d814a81dad81e6caf2ec9fdedb284ecc9c73076b62654547cc64ccdcae26e9"},
+]
+
+[package.extras]
+brotli = ["brotli (>=1.0.9)", "brotlicffi (>=0.8.0)"]
+h2 = ["h2 (>=4,<5)"]
+socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
+zstd = ["zstandard (>=0.18.0)"]
+
+[[package]]
 name = "uvicorn"
 version = "0.32.1"
 description = "The lightning-fast ASGI server."
@@ -1857,4 +1889,4 @@ email = ["email-validator"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "6a531b637e9773bf3c0fc1b40b573d25e6ce8d4cb53ec00d5739aef3154daf35"
+content-hash = "d6a265ebaa8f6a997b8cfa0e58ead226aa19c107a43f2d37bec8c356b7b2db5e"

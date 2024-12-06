@@ -1,6 +1,9 @@
 from contextlib import asynccontextmanager
 
 import redis.asyncio as redis
+from cache_fastapi.cacheMiddleware import (  # type: ignore[import-untyped]
+    CacheMiddleware,
+)
 from fastapi import Depends, FastAPI
 from fastapi_limiter import FastAPILimiter
 from fastapi_limiter.depends import RateLimiter
@@ -13,6 +16,7 @@ from api.shop import shop_routers
 from api.users import user_routers
 from core import admin as sqladmin
 from core.celery_app import engine
+from core.redis_cache import RedisBackend
 from core.settings import config
 
 
@@ -30,9 +34,10 @@ dependencies = []
 if config.DEBUG is False:
     dependencies.append(Depends(RateLimiter(times=5, seconds=3)))
 
+
 app = FastAPI(lifespan=lifespan, dependencies=dependencies)
 
-
+# main routers for app
 app.include_router(user_routers)
 app.include_router(product_routers)
 app.include_router(shop_routers)
@@ -42,6 +47,22 @@ app.include_router(order_routers)
 app.include_router(orderlist_routers)
 app.include_router(import_routers)
 
+
+# cache
+cached_endpoints = [
+    "/user/",
+    "/product/",
+    "/order/",
+    "/category",
+    "/parametr/",
+]
+backend = RedisBackend()
+app.add_middleware(
+    CacheMiddleware, cached_endpoints=cached_endpoints, backend=backend
+)
+
+
+# sqladmin
 admin = Admin(
     app, engine, authentication_backend=sqladmin.authentication_backend
 )
