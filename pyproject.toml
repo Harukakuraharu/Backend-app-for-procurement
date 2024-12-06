@@ -23,6 +23,8 @@ pyyaml = "^6.0.2"
 faker = "^30.8.2"
 fastapi-limiter = "^0.1.6"
 asgi-lifespan = "^2.1.0"
+sqladmin = "^0.20.1"
+itsdangerous = "^2.2.0"
 
 [tool.poetry.group.dev.dependencies]
 pylint = "^3.3.1"

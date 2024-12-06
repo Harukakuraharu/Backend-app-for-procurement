@@ -27,6 +27,8 @@ class Config(BaseSettings):
 
     BASE_URL: str = Field(default="")
 
+    DEBUG: bool = Field(default=True)
+
     @computed_field
     def redis_url(self) -> str:
         """Формирование url для redis"""
