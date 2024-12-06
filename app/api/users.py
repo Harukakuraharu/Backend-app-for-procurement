@@ -26,7 +26,10 @@ from schemas import schemas
 from tests.factory import faker
 
 
-user_routers = APIRouter(prefix="/user", tags=["User"])
+user_routers = APIRouter(
+    prefix="/user",
+    tags=["User"],
+)
 
 
 @user_routers.post("/registration/", response_model=schemas.UserCreateResponse)

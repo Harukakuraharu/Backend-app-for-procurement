@@ -21,6 +21,8 @@ python-multipart = "^0.0.18"
 gunicorn = "^23.0.0"
 pyyaml = "^6.0.2"
 faker = "^30.8.2"
+fastapi-limiter = "^0.1.6"
+asgi-lifespan = "^2.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pylint = "^3.3.1"
