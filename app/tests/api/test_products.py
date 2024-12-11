@@ -28,6 +28,20 @@ async def test_get_all_products(
     assert len(response.json()) == count
 
 
+async def test_get_product_id(factory, user_client: AsyncClient):
+    """Get product by id"""
+    await factory(fc.ShopFactory)
+    product = await factory(fc.ProductFactory)
+    response = await user_client.get(f"/product/{product.id}")
+    assert response.status_code == status.HTTP_200_OK
+
+
+async def test_get_product_id_not_exists(user_client: AsyncClient):
+    """Get product by id which not exists"""
+    response = await user_client.get("/product/5")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
 async def test_create_product(factory, user_client: AsyncClient):
     """Create product without categories and parametrs"""
     await factory(fc.ShopFactory)
@@ -67,6 +81,20 @@ async def test_create_full_products(
     }
     response = await user_client.post("/product/", json=data)
     assert response.status_code == status.HTTP_200_OK
+
+
+async def test_delete_products(
+    factory, user_client: AsyncClient, async_session: AsyncSession
+):
+    """Delete product"""
+    shop = await factory(fc.ShopFactory)
+    product = await factory(fc.ProductFactory, shop_id=shop.id)
+    response = await user_client.delete(f"/product/{product.id}")
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    obj = await async_session.scalar(
+        sa.select(models.Product).where(models.Product.id == product.id)
+    )
+    assert obj is None
 
 
 async def test_update_product(factory, user_client: AsyncClient):
@@ -127,20 +155,6 @@ async def test_update_product_parametrs(
 #         f"/product/parameters/{product.id}", json={"parametrs": [1]}
 #     )
 #     assert response.status_code == status.HTTP_200_OK
-
-
-async def test_delete_products(
-    factory, user_client: AsyncClient, async_session: AsyncSession
-):
-    """Delete product"""
-    shop = await factory(fc.ShopFactory)
-    product = await factory(fc.ProductFactory, shop_id=shop.id)
-    response = await user_client.delete(f"/product/{product.id}")
-    assert response.status_code == status.HTTP_200_OK
-    obj = await async_session.scalar(
-        sa.select(models.Product).where(models.Product.id == product.id)
-    )
-    assert obj is None
 
 
 async def test_get_category(factory, user_client: AsyncClient):

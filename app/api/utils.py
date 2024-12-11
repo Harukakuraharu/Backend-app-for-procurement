@@ -1,105 +1,48 @@
-from typing import Any
-
-import sqlalchemy as sa
 from fastapi import HTTPException, status
-from sqlalchemy.engine import ScalarResult
 
 import models
-from core import dependency
+from core.redis_cli import redis_client
+from schemas import schemas
 
 
-async def check_owner_product(
-    user_id: int, product: models.Product
-) -> models.Product:
-    if product is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Product is not exists",
-        )
+def check_owner_product(user_id: int, product: models.Product) -> None:
     if product.shop.user_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="It is not your product",
         )
-    return product
 
 
-async def check_current_item(
-    session: dependency.AsyncSessionDependency,
-    model: models.TypeModel,
-    item_in,
-    item_out: str | int,
-    user_id: int,
-) -> models.TypeModel:
-    """To check item exists and owner"""
-    stmt = sa.select(model).where(item_in == item_out)
-    item = await session.scalar(stmt)
-    if item is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"{model.__name__} is not exists",
-        )
-    if item.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"{model.__name__} is not yours",
-        )
-    return item
-
-
-async def check_owner(
-    session: dependency.AsyncSessionDependency,
-    model: models.TypeModel,
-    user_id: int,
-) -> ScalarResult[Any]:
-    """To check item owner"""
-    stmt = sa.select(model).where(model.user_id == user_id)
-    response = await session.scalars(stmt)
-    return response
-
-
-async def check_exists(
-    session: dependency.AsyncSessionDependency,
-    model: models.TypeModel,
-    item_in,
-    item_out: str | int,
-) -> models.TypeModel:
-    """To check item exists"""
-    stmt = sa.select(model).where(item_in == item_out)
-    item = await session.scalar(stmt)
-    if item is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"{model.__name__} is not exists",
-        )
-    return item
-
-
-async def check_shop_status(shop_status: bool):
+def check_shop_status(shop_status: bool) -> None:
     """To check status of shop"""
     if shop_status is False:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Shop would be active",
         )
-    return shop_status
 
 
-async def check_user_status(user_status: bool):
+def check_user_status(
+    user_status: models.UserStatus, common_status: models.UserStatus
+) -> None:
     """To check status of user"""
-    if user_status != models.UserStatus.MANAGER:
+    if user_status != common_status:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Order can get or update only manager",
+            detail="You do not have permission",
         )
-    return user_status
 
 
-async def check_user_shop_status(user_status: bool):
-    """To check status of user for shop"""
-    if user_status != models.UserStatus.SHOP:
+def check_shop_exists(user: schemas.UserResponse) -> None:
+    if user.shop is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Shop is not exists"
+        )
+
+
+def check_orderlist(user_id: int) -> None:
+    if not redis_client.get(user_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Can only shop",
+            detail="Shopping cart is empty",
         )
-    return user_status

@@ -204,11 +204,11 @@ class ParametrProductUpdateResponse(BaseModel):
 
 
 class ParametrProductUpdate(BaseModel):
-    parametrs: list["ParametrProductUpdateResponse"] | None = None
+    parametrs: list["ParametrProductUpdateResponse"]
 
 
 class ProductParametrsDelete(BaseModel):
-    parametrs: list[int] | None = None
+    parametrs: list[int]
 
 
 # class ParametrProductDeleteResponse(BaseModel):

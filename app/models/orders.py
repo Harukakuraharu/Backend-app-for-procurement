@@ -23,7 +23,7 @@ class Order(Base):
 
     id: Mapped[intpk]
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("user.id", ondelete="CASCADE")
+        ForeignKey("users.id", ondelete="CASCADE")
     )
     # pylint: disable=C0301
     user: Mapped["User"] = relationship(back_populates="orders", lazy="joined")  # type: ignore[name-defined]

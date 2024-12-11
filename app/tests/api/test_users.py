@@ -161,7 +161,7 @@ async def test_update_status(
 async def test_delete_current_user(user_client: AsyncClient):
     """Delete youself"""
     response = await user_client.delete("/user/me/")
-    assert response.status_code == status.HTTP_200_OK
+    assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
 async def test_create_address(
@@ -211,7 +211,7 @@ async def test_delete_address(user_client: AsyncClient, factory):
     """Delete address for current user"""
     address = await factory(fc.UserAddressFactory)
     response = await user_client.delete(f"/user/me/address/{address.id}")
-    assert response.status_code == status.HTTP_200_OK
+    assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
 @pytest.mark.parametrize(

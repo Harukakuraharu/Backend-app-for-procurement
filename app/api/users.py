@@ -1,12 +1,12 @@
 from datetime import timedelta
 from uuid import uuid4
 
-import sqlalchemy as sa
 from fastapi import Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from fastapi.routing import APIRouter
 
+import crud.users as crud
 import models
-from api import crud, utils
 from core import dependency, security
 from core.celery_app import send_email
 from core.redis_cli import redis_client
@@ -23,14 +23,15 @@ user_routers = APIRouter(
 
 @user_routers.post("/registration/", response_model=schemas.UserCreateResponse)
 async def create_user(
-    session: dependency.AsyncSessionDependency, data: schemas.UserCreate
+    session: dependency.AsyncSessionDependency, user_data: schemas.UserCreate
 ):
     """Регистрация пользователей"""
-    user_data = data.model_dump()
     verify_path = str(uuid4())
-    redis_client.set(verify_path, user_data["email"])
-    user_data["password"] = security.hash_password(user_data["password"])
-    user = await crud.create_item(session, user_data, models.User)
+    redis_client.set(verify_path, user_data.email)
+    user_data.password = security.hash_password(user_data.password)
+    user = await crud.UserCrud(session).create_or_update(
+        user_data.model_dump(), "create"
+    )
     await session.commit()
     await session.refresh(user)
     send_email.delay(
@@ -70,8 +71,7 @@ async def get_user_by_id(
     session: dependency.AsyncSessionDependency, user_id: int
 ):
     """Запрос информации о пользователе через id"""
-    user = await crud.get_item_id(session, models.User, user_id)
-    return user
+    return await crud.UserCrud(session).get_item_id(user_id)
 
 
 @user_routers.get("/me/", response_model=schemas.UserResponse)
@@ -89,11 +89,7 @@ async def get_users_me(
 )
 async def get_buyers(session: dependency.AsyncSessionDependency):
     """Запрос всех зарегестрированных пользователей-покупателей"""
-    stmt = sa.select(models.User).where(
-        models.User.status == models.UserStatus.BUYER
-    )
-    result = await session.scalars(stmt)
-    return result.unique().all()
+    return await crud.UserCrud(session).get_user_buyer(models.UserStatus.BUYER)
 
 
 @user_routers.patch("/me/", response_model=schemas.UserResponse)
@@ -105,7 +101,6 @@ async def update_user(
     """Обновление информации о себе"""
     update_data = data.model_dump(exclude_unset=True)
     user_status = update_data.get("status")
-    # type: ignore[arg-type]
     if user_status in (models.UserStatus.BUYER, models.UserStatus.MANAGER):
         if current_user.shop:
             raise HTTPException(
@@ -113,7 +108,7 @@ async def update_user(
                 detail="You have a shop",
             )
     update_data["id"] = current_user.id
-    user = await crud.update_item(session, models.User, update_data)
+    user = await crud.UserCrud(session).create_or_update(update_data, "update")
     await session.commit()
     await session.refresh(user)
     return user
@@ -125,8 +120,10 @@ async def delete_user(
     current_user: dependency.GetCurrentUserDependency,
 ):
     """Удаление пользовательского аккаунта"""
-    await crud.delete_item(session, models.User, current_user.id)
-    return {"status": "Successfully deleted"}
+    await crud.UserCrud(session).delete_item(current_user.id)
+    return JSONResponse(
+        content="Successfully deleted", status_code=status.HTTP_204_NO_CONTENT
+    )
 
 
 @user_routers.post("/me/address/", response_model=schemas.UserAddressResponse)
@@ -138,7 +135,7 @@ async def create_user_address(
     """Добавление адресов доставки для пользователей"""
     data_address = data.model_dump(exclude_unset=True)
     data_address["user_id"] = current_user.id
-    address = await crud.create_item(session, data_address, models.UserAddress)
+    address = await crud.UserAddressCrud(session).create_item(data_address)
     await session.commit()
     await session.refresh(address)
     return address
@@ -152,10 +149,7 @@ async def get_user_address(
     current_user: dependency.GetCurrentUserDependency,
 ):
     """Просмотр всех своих адресов доставки"""
-    addresses = await utils.check_owner(
-        session, models.UserAddress, current_user.id
-    )
-    return addresses.unique().all()
+    return await crud.UserAddressCrud(session).get_user_items(current_user.id)
 
 
 @user_routers.patch(
@@ -168,17 +162,10 @@ async def update_user_address(
     address_id: int,
 ):
     """Обновление своих адресов доставки"""
-    await utils.check_current_item(
-        session,
-        models.UserAddress,
-        models.UserAddress.id,
-        address_id,
-        current_user.id,
-    )
     update_data = data.model_dump(exclude_unset=True)
     update_data["user_id"] = current_user.id
     update_data["id"] = address_id
-    address = await crud.update_item(session, models.UserAddress, update_data)
+    address = await crud.UserAddressCrud(session).update_item(update_data)
     await session.commit()
     await session.refresh(address)
     return address
@@ -190,16 +177,13 @@ async def delete_user_address(
     address_id: int,
     current_user: dependency.GetCurrentUserDependency,
 ):
-    """Удаление адресов"""
-    await utils.check_current_item(
-        session,
-        models.UserAddress,
-        models.UserAddress.id,
-        address_id,
-        current_user.id,
+    """Удаление адресa"""
+    await crud.UserAddressCrud(session).delete_address(
+        address_id, current_user.id
     )
-    await crud.delete_item(session, models.UserAddress, address_id)
-    return {"status": "Successfully deleted"}
+    return JSONResponse(
+        content="Successfully deleted", status_code=status.HTTP_204_NO_CONTENT
+    )
 
 
 @user_routers.patch("/me/password/")
@@ -218,25 +202,25 @@ async def update_user_password(
     update_data.pop("old_password")
     update_data["id"] = current_user.id
     update_data["password"] = security.hash_password(update_data["password"])
-    await crud.update_item(session, models.User, update_data)
+    await crud.UserCrud(session).update_item(update_data)
     await session.commit()
-    return {"status": "Пароль обновлен"}
+    return JSONResponse(
+        content="Password successfully update", status_code=status.HTTP_200_OK
+    )
 
 
 @user_routers.post("/reset_password/")
 async def reser_password(
     session: dependency.AsyncSessionDependency,
-    update_data: schemas.PasswordReset,
+    data: schemas.PasswordReset,
 ):
     """Восстановление пароля через почту"""
-    data = update_data.model_dump()
-    user = await utils.check_exists(
-        session, models.User, models.User.email, data["email"]
-    )
-    data["id"] = user.id
+    update_data = data.model_dump()
+    user = await crud.UserCrud(session).get_user(update_data["email"])
+    update_data["id"] = user.id
     new_password = faker.password()
-    data["password"] = security.hash_password(new_password)
-    user = await crud.update_item(session, models.User, data)
+    update_data["password"] = security.hash_password(new_password)
+    user = await crud.UserCrud(session).update_item(update_data)
     msg = (
         f"Новый пароль для пользователя {user.email}: "
         f"{new_password} \nОбязательно поменяйте пароль в личном кабинете."
@@ -248,7 +232,7 @@ async def reser_password(
     }
     await session.commit()
     send_email.delay(celery_data)
-    return {"status": "Письмо с новым паролем отправлено на почту"}
+    return JSONResponse(content="Send email", status_code=status.HTTP_200_OK)
 
 
 @user_routers.get("/{verify_path}/")
@@ -260,11 +244,13 @@ async def verify_email(
     if not redis_client.get(verify_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Error",
+            detail="URL not found",
         )
     email = redis_client.get(verify_path)
-    user = await dependency.get_user(session, email.decode())
+    user = await crud.UserCrud(session).get_user(email.decode())
     user.active = True
     await session.commit()
     redis_client.delete(verify_path)
-    return {"status": "Successfully verify"}
+    return JSONResponse(
+        content="Successfully verify", status_code=status.HTTP_200_OK
+    )

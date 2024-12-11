@@ -15,7 +15,7 @@ class UserStatus(enum.Enum):
 
 
 class User(Base):
-    __tablename__ = "user"
+    __tablename__ = "users"
 
     id: Mapped[intpk]
     email: Mapped[str] = mapped_column(String(100), unique=True)
@@ -41,7 +41,7 @@ class Shop(Base):
     url: Mapped[str | None]
     active: Mapped[bool] = mapped_column(server_default=true())
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("user.id", ondelete="CASCADE"), unique=True
+        ForeignKey("users.id", ondelete="CASCADE"), unique=True
     )
     created_at: Mapped[datetime.datetime] = mapped_column(
         server_default=func.now()  # pylint: disable=E1102
@@ -62,7 +62,7 @@ class UserAddress(Base):
     city: Mapped[str]
     address: Mapped[str]
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("user.id", ondelete="CASCADE")
+        ForeignKey("users.id", ondelete="CASCADE")
     )
     user: Mapped[User] = relationship(
         back_populates="addresses", lazy="selectin"

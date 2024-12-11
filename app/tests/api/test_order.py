@@ -86,7 +86,7 @@ async def test_delete_orderlist(user_client: AsyncClient, factory):
     response = await user_client.post("/orderlist/", json=data)
     assert response.status_code == status.HTTP_200_OK
     response = await user_client.delete("/orderlist/")
-    assert response.status_code == status.HTTP_200_OK
+    assert response.status_code == status.HTTP_204_NO_CONTENT
     assert redis_client.get(1) is None
 
 

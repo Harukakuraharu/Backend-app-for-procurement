@@ -4,8 +4,9 @@ import bcrypt
 import jwt
 from fastapi import HTTPException, status
 
-from core.dependency import AsyncSessionDependency, get_user
+from core.dependency import AsyncSessionDependency
 from core.settings import config
+from crud.users import UserCrud
 
 
 def hash_password(password: str) -> str:
@@ -20,7 +21,7 @@ def check_password(
 
 
 async def auth(session: AsyncSessionDependency, email: str, password: str):
-    user = await get_user(session, email)
+    user = await UserCrud(session).get_user(email)
     if not user:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "User is not exists")
     if user.active is False:

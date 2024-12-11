@@ -121,7 +121,7 @@ async def test_delete_shop(
     """Delete youself shop"""
     shop = await factory(ShopFactory)
     response = await user_client.delete("/shop/me/")
-    assert response.status_code == status.HTTP_200_OK
+    assert response.status_code == status.HTTP_204_NO_CONTENT
     obj = await async_session.scalar(
         sa.select(models.Shop).where(models.Shop.id == shop.id)
     )

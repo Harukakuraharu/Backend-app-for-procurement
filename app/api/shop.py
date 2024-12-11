@@ -1,9 +1,10 @@
-import sqlalchemy as sa
-from fastapi import HTTPException, status
+from fastapi import status
+from fastapi.responses import JSONResponse
 from fastapi.routing import APIRouter
 
+import crud.shops as crud
 import models
-from api import crud, utils
+from api import utils
 from core.dependency import AsyncSessionDependency, GetCurrentUserDependency
 from schemas import schemas
 
@@ -18,10 +19,10 @@ async def create_shop(
     user: GetCurrentUserDependency,
 ):
     """Создание магазина"""
-    await utils.check_user_shop_status(user.status)  # type: ignore[arg-type]
+    utils.check_user_status(user.status, models.UserStatus.SHOP)
     shop_data = data.model_dump()
     shop_data["user_id"] = user.id
-    shop = await crud.create_item(session, shop_data, models.Shop)
+    shop = await crud.ShopCrud(session).create_or_update(shop_data, "create")
     await session.commit()
     await session.refresh(shop)
     return shop
@@ -30,34 +31,22 @@ async def create_shop(
 @shop_routers.get("/", response_model=list[schemas.ShopsResponse])
 async def get_shops(session: AsyncSessionDependency):
     """Просмотр списка активных магазинов"""
-    stmt = sa.select(models.Shop).where(
-        models.Shop.active == True  # pylint: disable=C0121
-    )
-    response = await session.scalars(stmt)
-    return response.unique().all()
+    return await crud.ShopCrud(session).get_shop_active(True)
 
 
 @shop_routers.get("/{shop_id}", response_model=schemas.ShopResponse)
 async def get_shop_by_id(session: AsyncSessionDependency, shop_id: int):
     """Просмотр определенного магазина по id со списком продуктов"""
-    shop = await utils.check_exists(
-        session, models.Shop, models.Shop.id, shop_id
-    )
-    return shop
+    return await crud.ShopCrud(session).get_item_id(shop_id)
 
 
 @shop_routers.get("/me/", response_model=schemas.ShopResponse)
 async def get_shop_my(
     user: GetCurrentUserDependency,
 ):
-    """Просмотр своего магаизна"""
-    shop = user.shop
-    if not shop:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="You do not have a shop",
-        )
-    return shop
+    """Просмотр своего магазина"""
+    utils.check_shop_exists(user)
+    return user.shop
 
 
 @shop_routers.patch("/me/", response_model=schemas.ShopsResponse)
@@ -68,12 +57,9 @@ async def update_shop(
 ):
     """Обновление информации о своем магазине"""
     update_data = data.model_dump(exclude_unset=True)
-    if user.shop is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Shop is not exists"
-        )
-    update_data["id"] = user.shop.id
-    shop = await crud.update_item(session, models.Shop, update_data)
+    utils.check_shop_exists(user)
+    update_data["id"] = user.shop.id  # type: ignore[union-attr]
+    shop = await crud.ShopCrud(session).create_or_update(update_data, "update")
     await session.commit()
     await session.refresh(shop)
     return shop
@@ -85,11 +71,10 @@ async def delete_shop(
     user: GetCurrentUserDependency,
 ):
     """Удаление своего магазина"""
-    if user.shop is None:  # type:ignore[attr-defined]
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Shop is not exists"
-        )
-    await crud.delete_item(
-        session, models.Shop, user.shop.id  # type:ignore[attr-defined]
+    utils.check_shop_exists(user)
+    await crud.ShopCrud(session).delete_item(
+        user.shop.id  # type: ignore[union-attr]
     )
-    return {"status": "Successfully deleted"}
+    return JSONResponse(
+        content="Successfully deleted", status_code=status.HTTP_204_NO_CONTENT
+    )

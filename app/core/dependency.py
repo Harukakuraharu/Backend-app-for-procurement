@@ -1,7 +1,6 @@
 from typing import Annotated
 
 import jwt
-import sqlalchemy as sa
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import InvalidTokenError
@@ -9,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 import models
 from core.settings import config
+from crud.users import UserCrud
 from schemas.schemas import UserResponse
 
 
@@ -22,16 +22,10 @@ AsyncSessionDependency = Annotated[
 ]
 
 
-async def get_user(session: AsyncSessionDependency, email: str):
-    stmt = sa.select(models.User).where(models.User.email == email)
-    user = await session.scalar(stmt)
-    return user
-
-
 async def get_current_user(
     token: Annotated[HTTPAuthorizationCredentials, Depends(HTTPBearer())],
     session: AsyncSessionDependency,
-) -> UserResponse:
+) -> models.User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -46,7 +40,7 @@ async def get_current_user(
             raise credentials_exception
     except InvalidTokenError as err:
         raise credentials_exception from err
-    user = await get_user(session, email)
+    user = await UserCrud(session).get_user(email)
     if user is None:
         raise credentials_exception
     return user
