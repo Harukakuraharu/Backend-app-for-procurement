@@ -47,7 +47,7 @@ build-backend = "poetry.core.masonry.api"
 
 # black
 [tool.black]
-line-length = 79
+line-length = 150
 extend-exclude = "migrations/"
 
 # isort
@@ -66,7 +66,7 @@ exclude = ["migrations/"]
 [tool.pylint]
 ignore = [".git", "__pycache__", "migrations", ".venv"]
 max-line-length = 79
-disable = ["C0114", "C0115", "C0116", "W1514", "W3101", "R0903", "C0103"]
+disable = ["C0114", "C0115", "C0116", "W1514", "W3101", "R0903", "C0103", "C0301"]
 
 # pytest
 [tool.pytest.ini_options]
