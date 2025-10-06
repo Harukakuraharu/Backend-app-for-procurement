@@ -1,5 +1,6 @@
 [tool.poetry]
-package-mode = false
+name = "Test App"
+package-mode = true
 version = "0.1"
 
 [tool.poetry-dynamic-versioning]
