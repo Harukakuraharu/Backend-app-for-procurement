@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "Test App"
 package-mode = true
-version = "0.1"
+version = "0.0.0"
 
 [tool.poetry-dynamic-versioning]
 enable = true
